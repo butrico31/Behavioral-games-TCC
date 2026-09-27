@@ -11,13 +11,13 @@ export interface GameConfig {
 
 export const GAMES_CONFIG: Record<GameType, GameConfig> = {
   [GameType.ROULETTE]: {
-    name: 'Roulette Betting Game',
-    description: 'A roulette-style betting game',
+    name: 'Roleta de Apostas',
+    description: 'Um jogo de apostas no estilo roleta',
     redirectUrl: 'https://roulette-game.example.com',
   },
   [GameType.PRISONER]: {
-    name: "Prisoner's Dilemma",
-    description: "A behavioral game based on the classic Prisoner's Dilemma theory",
+    name: 'Dilema do Prisioneiro',
+    description: 'Um jogo comportamental baseado na teoria clássica do Dilema do Prisioneiro',
     redirectUrl: 'http://localhost:3001',
   },
 };
