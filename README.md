@@ -36,12 +36,14 @@ src/
 ### Auth
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/auth/login` | Login do professor |
+| POST | `/auth/login` | Login do professor (403 enquanto o e-mail não for verificado) |
 
 ### Users
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/users` | Criar usuário |
+| POST | `/users` | Criar usuário (e-mail `@fho.edu.br` obrigatório; envia código de verificação) |
+| POST | `/users/verify-email` | Confirmar o código de 6 dígitos (vale 15 min, máx. 5 tentativas) |
+| POST | `/users/resend-verification` | Reenviar o código (no máximo 1 por minuto) |
 | GET | `/users` | Listar usuários |
 | GET | `/users/:id` | Buscar usuário |
 | PATCH | `/users/:id` | Atualizar usuário |

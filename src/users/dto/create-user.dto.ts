@@ -1,5 +1,7 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+const INSTITUTIONAL_EMAIL_PATTERN = /@fho\.edu\.br$/i;
 
 export class CreateUserDto {
   @ApiProperty({
@@ -11,11 +13,15 @@ export class CreateUserDto {
   name: string;
 
   @ApiProperty({
-    example: 'joao.silva',
-    description: 'Username for login',
+    example: 'joao.silva@fho.edu.br',
+    description:
+      'Institutional email (@fho.edu.br) used as login. A verification code is sent to it.',
   })
   @IsNotEmpty()
-  @IsString()
+  @IsEmail()
+  @Matches(INSTITUTIONAL_EMAIL_PATTERN, {
+    message: 'login must be an institutional @fho.edu.br email',
+  })
   login: string;
 
   @ApiProperty({

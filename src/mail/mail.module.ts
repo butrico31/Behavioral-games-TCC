@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { SessionModule } from '../session/session.module';
 import { MailController } from './mail.controller';
-import { MailService } from './mail.service';
+import { MailSenderModule } from './mail-sender.module';
 import { ReportXlsxService } from './report-xlsx.service';
 import { MatchResultXlsxService } from './match-result-xlsx.service';
 
 @Module({
-  imports: [SessionModule],
+  imports: [SessionModule, MailSenderModule],
   controllers: [MailController],
-  providers: [MailService, ReportXlsxService, MatchResultXlsxService],
-  exports: [MailService, ReportXlsxService, MatchResultXlsxService],
+  providers: [ReportXlsxService, MatchResultXlsxService],
+  exports: [MailSenderModule, ReportXlsxService, MatchResultXlsxService],
 })
 export class MailModule {}

@@ -33,6 +33,10 @@ export class AuthController {
     status: 401,
     description: 'Incorrect credentials',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'Email not verified yet - confirm the code sent at registration',
+  })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.login, dto.password);
   }
