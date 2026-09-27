@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { PlayLandingPage } from '../modules/play/pages/PlayLandingPage'
 import { LoginPage } from '../modules/auth/pages/LoginPage'
 import { RegisterPage } from '../modules/auth/pages/RegisterPage'
+import { VerifyEmailPage } from '../modules/auth/pages/VerifyEmailPage'
 import { SessionsPage } from '../modules/game-session/pages/SessionsPage'
 import { CreateSessionPage } from '../modules/game-session/pages/CreateSessionPage'
 import { MatchLobbyPage } from '../modules/game-session/pages/MatchLobbyPage'
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/verify-email',
+    element: <VerifyEmailPage />,
   },
   {
     path: '/sessions',

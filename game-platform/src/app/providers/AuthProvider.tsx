@@ -86,6 +86,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await authService.register(payload)
   }, [])
 
+  const verifyEmail = useCallback(async (email: string, code: string): Promise<void> => {
+    await authService.verifyEmail(email, code)
+  }, [])
+
+  const resendVerificationCode = useCallback(async (email: string): Promise<void> => {
+    await authService.resendVerificationCode(email)
+  }, [])
+
   const logout = useCallback(() => {
     authService.logout()
     setUser(null)
@@ -99,6 +107,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     is_loading,
     login,
     register,
+    verifyEmail,
+    resendVerificationCode,
     logout
   }
 

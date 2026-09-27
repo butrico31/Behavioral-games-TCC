@@ -30,6 +30,16 @@ export const validateEmail = (email: string): boolean => {
   return email_pattern.test(email)
 }
 
+export const INSTITUTIONAL_EMAIL_DOMAIN = 'fho.edu.br'
+
+/**
+ * Valida e-mail institucional (@fho.edu.br), exigido no cadastro de docentes
+ */
+export const validateInstitutionalEmail = (email: string): boolean => {
+  const normalized_email = email.trim().toLowerCase()
+  return validateEmail(normalized_email) && normalized_email.endsWith(`@${INSTITUTIONAL_EMAIL_DOMAIN}`)
+}
+
 /**
  * Limita comprimento de string
  */

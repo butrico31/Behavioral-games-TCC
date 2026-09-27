@@ -1,6 +1,14 @@
 import { api_client } from '../../../infrastructure/api/api-client'
 import { AUTH_TOKEN_STORAGE_KEY } from '../../../shared/constants/storageKeys'
-import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, User } from '../types'
+import type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+  ResendVerificationRequest,
+  User,
+  VerifyEmailRequest
+} from '../types'
 
 /**
  * Parses a JWT's payload segment (header.payload.signature). Returns null for
@@ -33,6 +41,20 @@ export const authService = {
   register: async (payload: RegisterRequest): Promise<RegisterResponse> => {
     const response = await api_client.post<RegisterResponse>('/users', payload)
     return response.data
+  },
+
+  /**
+   * Confirma o código de 6 dígitos enviado por e-mail no cadastro
+   */
+  verifyEmail: async (login: string, code: string): Promise<void> => {
+    await api_client.post('/users/verify-email', { login, code } as VerifyEmailRequest)
+  },
+
+  /**
+   * Pede um novo código de verificação (o backend aceita 1 por minuto)
+   */
+  resendVerificationCode: async (login: string): Promise<void> => {
+    await api_client.post('/users/resend-verification', { login } as ResendVerificationRequest)
   },
 
   /**

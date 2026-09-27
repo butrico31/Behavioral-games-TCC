@@ -21,4 +21,13 @@ assert.equal(mapAuthError(other_status, opts), 'auth failed')
 
 assert.equal(mapAuthError(new Error('plain'), opts), 'Erro inesperado. Tente novamente.')
 
+const opts_with_extra = { ...opts, status_messages: { 410: 'expired', 500: 'mail down' } }
+const gone = new AxiosError('x', undefined, undefined, undefined, { status: 410 } as never)
+assert.equal(mapAuthError(gone, opts_with_extra), 'expired')
+assert.equal(mapAuthError(server_error, opts_with_extra), 'Erro no servidor. Tente novamente mais tarde.')
+const mail_down = new AxiosError('x', undefined, undefined, undefined, { status: 500 } as never)
+assert.equal(mapAuthError(mail_down, opts_with_extra), 'mail down')
+assert.equal(mapAuthError(matched, opts_with_extra), 'wrong creds')
+assert.equal(mapAuthError(other_status, opts_with_extra), 'auth failed')
+
 console.log('mapAuthError: ok')

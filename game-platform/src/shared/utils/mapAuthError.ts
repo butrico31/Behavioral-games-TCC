@@ -7,6 +7,8 @@ interface MapAuthErrorOptions {
   message: string
   /** Message shown for any other non-5xx, non-network AxiosError. */
   fallback_message: string
+  /** Messages for other statuses this screen handles (e.g. 410/429 on email verification). */
+  status_messages?: Partial<Record<number, string>>
 }
 
 /**
@@ -21,6 +23,10 @@ export function mapAuthError(error: unknown, options: MapAuthErrorOptions): stri
 
   if (error.response?.status === options.status) {
     return options.message
+  }
+  const status_message = error.response && options.status_messages?.[error.response.status]
+  if (status_message) {
+    return status_message
   }
   if (error.response && error.response.status >= 500) {
     return 'Erro no servidor. Tente novamente mais tarde.'

@@ -122,6 +122,7 @@ Arquivo `src/app/router.tsx`:
 - `/` -> `HomePage`
 - `/login` -> `LoginPage`
 - `/register` -> `RegisterPage`
+- `/verify-email` -> `VerifyEmailPage` (codigo de verificacao do e-mail)
 - `/sessions` -> `SessionsPage`
 - `/create-session` -> `CreateSessionPage` (protegida)
 - `/reports` -> `ReportsPage` (protegida)
@@ -153,6 +154,13 @@ Protecao de rota em `ProtectedRoute`:
 3. No login, chama `/auth/login`.
 4. Salva token e decodifica payload para estado local do usuario.
 5. `is_authenticated` controla acesso a rotas protegidas.
+
+### Cadastro e verificacao de e-mail
+
+1. O cadastro so aceita e-mail institucional `@fho.edu.br` (validado no front e no backend).
+2. O backend envia um codigo de 6 digitos por e-mail (vale 15 min, max. 5 tentativas).
+3. `RegisterPage` leva para `/verify-email`, que chama `POST /users/verify-email`; o reenvio (`POST /users/resend-verification`) e liberado 1x por minuto.
+4. Enquanto o e-mail nao e verificado, `/auth/login` responde `403` e a `LoginPage` redireciona para `/verify-email`.
 
 ### Observacoes
 

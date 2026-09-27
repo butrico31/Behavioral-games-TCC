@@ -18,6 +18,15 @@ export interface RegisterResponse {
   login: string
 }
 
+export interface VerifyEmailRequest {
+  login: string
+  code: string
+}
+
+export interface ResendVerificationRequest {
+  login: string
+}
+
 export interface User {
   id: string
   login: string
@@ -34,5 +43,7 @@ export interface AuthState {
 export interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (payload: RegisterRequest) => Promise<void>
+  verifyEmail: (email: string, code: string) => Promise<void>
+  resendVerificationCode: (email: string) => Promise<void>
   logout: () => void
 }

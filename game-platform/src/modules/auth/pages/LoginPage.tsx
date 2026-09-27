@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { AxiosError } from 'axios'
 import { Header } from '../../../shared/components/Header'
 import { useAuth } from '../hooks/useAuth'
 import { validateEmail } from '../../../shared/utils/validation'
@@ -14,7 +15,7 @@ export function LoginPage() {
   const location = useLocation()
   const root_ref = useRef<HTMLDivElement | null>(null)
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => (location.state as { email?: string } | null)?.email ?? '')
   const [password, setPassword] = useState('')
   const [error_message, setErrorMessage] = useState('')
   const [is_submitting, setIsSubmitting] = useState(false)
@@ -23,8 +24,8 @@ export function LoginPage() {
   useGsapReveal('[data-auth="intro"], [data-auth="form"]', { root: root_ref, stagger: 0.08 })
 
   useEffect(() => {
-    const state = location.state as { registered?: boolean } | null
-    setShowSuccess(Boolean(state?.registered))
+    const state = location.state as { verified?: boolean } | null
+    setShowSuccess(Boolean(state?.verified))
   }, [location.state])
 
   const handleSubmit = useCallback(async (event: React.FormEvent) => {
@@ -56,6 +57,11 @@ export function LoginPage() {
       const redirect_target = state?.from && typeof state.from === 'string' ? state.from : '/sessions'
       navigate(redirect_target)
     } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 403) {
+        navigate('/verify-email', { state: { email: email.trim(), unverified: true } })
+        return
+      }
+
       setErrorMessage(mapAuthError(error, {
         status: 401,
         message: 'E-mail ou senha incorretos. Tente novamente.',
@@ -89,7 +95,7 @@ export function LoginPage() {
 
             {show_success && (
               <div className="mb-4 rounded-xl border border-success/40 bg-success/20 px-4 py-3 text-sm font-semibold text-success">
-                Conta criada com sucesso. Faça login para continuar.
+                E-mail verificado com sucesso. Faça login para continuar.
               </div>
             )}
 
