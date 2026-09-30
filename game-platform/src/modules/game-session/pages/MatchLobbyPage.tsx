@@ -4,6 +4,7 @@ import { WaitingRoomScreen } from "../components/WaitingRoomScreen"
 import { HowToPlayScreen } from "../components/HowToPlayScreen"
 import { ReadyScreen } from "../components/ReadyScreen"
 import { useMatchRoom } from "../hooks/useMatchRoom"
+import { SessionClockChip } from "../components/SessionClockChip"
 
 /** Orquestra as três telas antes da partida: espera → regras → confirmação. */
 export function MatchLobbyPage() {
@@ -11,7 +12,7 @@ export function MatchLobbyPage() {
   const room = useMatchRoom(sessionId)
 
   return (
-    <MatchShell>
+    <MatchShell notice={<SessionClockChip sessionEndsAt={room.sessionEndsAt} />}>
       {(room.phase === "searching" || room.phase === "found") && (
         <WaitingRoomScreen opponentJoined={room.phase === "found"} onReviewRules={room.reviewRules} />
       )}

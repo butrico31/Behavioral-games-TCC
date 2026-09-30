@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { CARD_COLOR, CARD_NAME, type Card, type PayoffPair, type RoundPhase } from "../types"
+import { CARD_COLOR, CARD_NAME, type Card, type RoundPhase, type RoundPointsView } from "../types"
 import { FitToScreen, panelClass } from "./MatchShell"
 
 type Props = {
@@ -15,7 +15,9 @@ type Props = {
   secondsPerRound: number
   yourCard: Card | null
   opponentCard: Card | null
-  roundPoints: PayoffPair | null
+  roundPoints: RoundPointsView | null
+  /** false esconde a pontuação do oponente durante a partida (configuração da sessão). */
+  userViewPoints?: boolean
   playedByTime?: boolean
   /** O outro jogador caiu; o servidor pausa a rodada até ele voltar. */
   opponentAway?: boolean
@@ -137,6 +139,7 @@ export function RoundScreen({
   yourCard,
   opponentCard,
   roundPoints,
+  userViewPoints = true,
   playedByTime,
   opponentAway = false,
   onPick,
@@ -155,15 +158,27 @@ export function RoundScreen({
     reveal: playedByTime ? "Sua carta foi jogada pelo tempo esgotado." : "As duas cartas viraram ao mesmo tempo.",
   }[phase]
 
+  // Com a pontuação do oponente escondida, a frase fala só do que VOCÊ ganhou: o texto antigo
+  // ("o Jogador 2 não pontuou") entregava em palavras o número que o placar esconde.
+  const hideOpponentPoints = !userViewPoints || (roundPoints !== null && roundPoints[1] === null)
+
   const revealNote =
     phase === "reveal" && yourCard && opponentCard && roundPoints
       ? yourCard === opponentCard
         ? yourCard === "B"
-          ? "Os dois escolheram preto: ganho equilibrado para ambos."
-          : "Os dois escolheram vermelho: ganho mínimo para ambos."
-        : roundPoints[0] > roundPoints[1]
-          ? `Você obteve o ganho máximo desta rodada; o ${opponentName} não pontuou.`
-          : `Você não pontuou nesta rodada; o ${opponentName} obteve o ganho máximo.`
+          ? hideOpponentPoints
+            ? "Os dois escolheram preto."
+            : "Os dois escolheram preto: ganho equilibrado para ambos."
+          : hideOpponentPoints
+            ? "Os dois escolheram vermelho."
+            : "Os dois escolheram vermelho: ganho mínimo para ambos."
+        : hideOpponentPoints
+          ? roundPoints[0] > 0
+            ? "Você obteve o ganho máximo desta rodada."
+            : "Você não pontuou nesta rodada."
+          : roundPoints[0] > (roundPoints[1] ?? 0)
+            ? `Você obteve o ganho máximo desta rodada; o ${opponentName} não pontuou.`
+            : `Você não pontuou nesta rodada; o ${opponentName} obteve o ganho máximo.`
       : ""
 
   return (
@@ -238,7 +253,7 @@ export function RoundScreen({
                     {CARD_NAME[opponentCard]}
                   </span>
                 </span>
-                <SideBadge background="#12151B">{pts(roundPoints[1])}</SideBadge>
+                {roundPoints[1] !== null && <SideBadge background="#12151B">{pts(roundPoints[1])}</SideBadge>}
               </div>
             ) : (
               <div className="relative aspect-[92/128] h-[calc(var(--opp-h)-8px)]">
