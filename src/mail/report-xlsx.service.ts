@@ -49,6 +49,7 @@ const SETTINGS_LABELS: Record<string, string> = {
   userViewPoints: 'Jogador vê pontuação',
   limitRounds: 'Limite de rodadas',
   roundTimeLimit: 'Tempo por rodada (s)',
+  sessionTimeLimit: 'Tempo total da sessão (min)',
 };
 
 const NAVY = 'FF1F4E78';

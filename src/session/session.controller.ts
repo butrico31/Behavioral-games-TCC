@@ -570,6 +570,18 @@ export class SessionController {
     return this.sessionService.finish(id);
   }
 
+  @Get(':id/clock')
+  @ApiOperation({
+    summary: 'Session clock',
+    description: 'Prazo da sessão (início, fim e relógio do servidor) para as telas do jogador',
+  })
+  @ApiParam({ name: 'id', description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Clock returned successfully' })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  getClock(@Param('id') id: string) {
+    return this.sessionService.getClock(id);
+  }
+
   @Delete(':id')
   @ApiOperation({
     summary: 'Delete session',

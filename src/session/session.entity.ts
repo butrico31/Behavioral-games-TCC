@@ -54,6 +54,17 @@ export class Session {
   @Column({ type: 'timestamp', nullable: true })
   finished_at?: Date;
 
+  /** Relogio da sessao: gravado quando o PRIMEIRO jogador entra, se a configuracao tiver tempo. */
+  @Column({ type: 'timestamptz', nullable: true })
+  started_at?: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  expires_at?: Date;
+
+  /** 'professor' | 'tempo' */
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  finished_reason?: string;
+
   @DeleteDateColumn()
   deleted_at?: Date;
 }

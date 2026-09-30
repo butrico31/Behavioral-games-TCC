@@ -8,12 +8,14 @@ import { GameService } from '../game/game.service';
 import { GameType } from '../game/games.enum';
 import { SettingsService } from '../settings/settings.service';
 import { Settings } from '../settings/settings.entity';
+import { SettingsGamePrisoner } from '../settings/settings-game-prisoner.entity';
 import { UsersService } from '../users/users.service';
 import { isValidPlayerField, PLAYER_OPTIONAL_FIELDS } from '../common/constants/player-fields.constants';
 import { Player } from '../player/player.entity';
 import { Match, MatchStatus } from '../match/match.entity';
 import { JoinSessionDto } from './dto/join-session.dto';
 import { User } from '../users/user.entity';
+import { PrisonerService } from '../prisoner/prisoner.service';
 
 @Injectable()
 export class SessionService {
@@ -26,6 +28,7 @@ export class SessionService {
     private gameService: GameService,
     private settingsService: SettingsService,
     private usersService: UsersService,
+    private prisonerService: PrisonerService,
   ) {}
 
   private getMaxPlayersForGame(game: GameType): number {
@@ -136,6 +139,7 @@ export class SessionService {
           userViewPoints: dto.settings.userViewPoints,
           limitRounds: dto.settings.limitRounds,
           roundTimeLimit: dto.settings.roundTimeLimit,
+          sessionTimeLimit: dto.settings.sessionTimeLimit,
           timeLimit: dto.settings.timeLimit,
           pointsLimit: dto.settings.pointsLimit,
           popup: dto.settings.popup,
@@ -333,6 +337,24 @@ export class SessionService {
         throw new BadRequestException('Esta sessão já foi encerrada. Solicite um novo código ao professor.');
       }
 
+      // Relógio da sessão: decidido com a professora que começa quando o PRIMEIRO jogador entra.
+      // Fica gravado (timestamptz) para sobreviver a reinício do backend e ser o servidor quem decide.
+      if (session.expires_at && session.expires_at.getTime() <= Date.now()) {
+        throw new BadRequestException('O tempo desta sessão terminou. Solicite um novo código ao professor.');
+      }
+
+      const prisonerSettings = session.settings as SettingsGamePrisoner;
+      const sessionMinutes = prisonerSettings?.sessionTimeLimit ?? null;
+      if (sessionMinutes && sessionMinutes > 0 && !session.started_at) {
+        const startedAt = new Date();
+        const expiresAt = new Date(startedAt.getTime() + sessionMinutes * 60_000);
+        await manager
+          .getRepository(Session)
+          .update({ id: session.id }, { started_at: startedAt, expires_at: expiresAt });
+        session.started_at = startedAt;
+        session.expires_at = expiresAt;
+      }
+
       this.validateRequiredPlayerFields(session.inputInfo, payload);
 
       const playerRepo = manager.getRepository(Player);
@@ -419,6 +441,8 @@ export class SessionService {
       // If marking as inactive, set finish time
       if (!dto.isActive && !session.finished_at) {
         session.finished_at = new Date();
+        session.finished_reason = session.finished_reason ?? 'professor';
+        this.prisonerService.endMatchesOfSession(session.id, 'sessao_encerrada');
       }
     }
 
@@ -426,10 +450,42 @@ export class SessionService {
   }
 
   async finish(id: string): Promise<Session> {
-    const session = await this.findOne(id);
-    session.isActive = false;
-    session.finished_at = new Date();
-    return await this.sessionRepository.save(session);
+    await this.finishSession(id, 'professor');
+    return await this.findOne(id);
+  }
+
+  /**
+   * Encerra a sessão por um caminho só (botão da professora ou fim do tempo). UPDATE condicional
+   * em vez de findOne+save: é idempotente quando o clique e o relógio caem juntos, e não reescreve
+   * a relação de jogadores (que tem cascade).
+   */
+  async finishSession(id: string, reason: 'professor' | 'tempo'): Promise<void> {
+    await this.sessionRepository.update(
+      { id, isActive: true },
+      { isActive: false, finished_at: new Date(), finished_reason: reason },
+    );
+    // Sem isto, encerrar a sessão não parava nada: as partidas seguem vivas na memória do gateway.
+    this.prisonerService.endMatchesOfSession(id, 'sessao_encerrada');
+  }
+
+  /** Relógio da sessão para as telas do jogador (o cliente só exibe; quem decide é o servidor). */
+  async getClock(id: string) {
+    const session = await this.sessionRepository.findOne({ where: { id }, relations: ['settings'] });
+
+    if (!session) {
+      throw new NotFoundException(`Session with ID ${id} not found`);
+    }
+
+    const settings = session.settings as SettingsGamePrisoner;
+    return {
+      sessionId: session.id,
+      isActive: session.isActive,
+      sessionTimeLimit: settings?.sessionTimeLimit ?? null,
+      startedAt: session.started_at ? session.started_at.getTime() : null,
+      expiresAt: session.expires_at ? session.expires_at.getTime() : null,
+      finishedReason: session.finished_reason ?? null,
+      serverNow: Date.now(),
+    };
   }
 
   async remove(id: string): Promise<void> {

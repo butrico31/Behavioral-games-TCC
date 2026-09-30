@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, IsEnum, ValidateNested } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, IsEnum, ValidateNested, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GameType } from '../../game/games.enum';
 import { Type } from 'class-transformer';
@@ -52,6 +52,8 @@ export class CreateSettingsDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0) // 0 = não informado; o serviço aplica o default de 10 rodadas
+  @Max(50)
   limitRounds?: number;
 
   @ApiPropertyOptional({
@@ -60,7 +62,20 @@ export class CreateSettingsDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0) // 0 = sem limite; o serviço grava null
+  @Max(600)
   roundTimeLimit?: number | null;
+
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Tempo total da sessão em MINUTOS (Prisoner). 0/null = sem limite.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0) // 0 = sem limite; o serviço grava null
+  @Max(480)
+  sessionTimeLimit?: number | null;
+
 
   @ApiPropertyOptional({
     example: 60,

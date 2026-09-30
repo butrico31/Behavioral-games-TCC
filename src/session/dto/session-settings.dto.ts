@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, ValidateNested } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, ValidateNested, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -46,6 +46,8 @@ export class SessionSettingsDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0) // 0 = não informado; o serviço aplica o default de 10 rodadas
+  @Max(50)
   limitRounds?: number;
 
   @ApiPropertyOptional({
@@ -54,7 +56,20 @@ export class SessionSettingsDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0) // 0 = sem limite; o serviço grava null
+  @Max(600)
   roundTimeLimit?: number | null;
+
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Tempo total da sessão em MINUTOS (Prisoner). 0/null = sem limite.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0) // 0 = sem limite; o serviço grava null
+  @Max(480)
+  sessionTimeLimit?: number | null;
+
 
   // Game-specific fields for Roulette (optional)
   @ApiPropertyOptional({

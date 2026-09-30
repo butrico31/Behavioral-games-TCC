@@ -75,6 +75,14 @@ export class Match {
   @Column({ type: 'int', nullable: true })
   matchTime?: number;
 
+  /** 'rodadas' (fim natural), 'tempo_sessao' ou 'sessao_encerrada'. */
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  endedReason?: string;
+
+  /** Rodada que estava aberta quando a sessao acabou: entra no relatorio sem pontos. */
+  @Column({ type: 'int', nullable: true })
+  interruptedRound?: number | null;
+
   @Column({
     type: 'enum',
     enum: MatchStatus,

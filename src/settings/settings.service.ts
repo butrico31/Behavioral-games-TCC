@@ -36,6 +36,7 @@ export class SettingsService {
       { name: 'userViewPoints', type: 'boolean' },
       { name: 'limitRounds', type: 'number' },
       { name: 'roundTimeLimit', type: 'number' },
+      { name: 'sessionTimeLimit', type: 'number' },
     ];
 
     const roulette = [
@@ -86,8 +87,11 @@ export class SettingsService {
         configName: dto.configName,
         game: dto.game,
         userViewPoints: dto.userViewPoints ?? false,
-        limitRounds: dto.limitRounds ?? 10,
-        roundTimeLimit: dto.roundTimeLimit ?? null,
+        // Campo numérico vazio no formulário chega como 0, e `??` não cobre 0: em rodadas, 0
+        // significa "não informado" (cai no default 10); em tempo, significa "sem limite".
+        limitRounds: dto.limitRounds && dto.limitRounds > 0 ? dto.limitRounds : 10,
+        roundTimeLimit: dto.roundTimeLimit && dto.roundTimeLimit > 0 ? dto.roundTimeLimit : null,
+        sessionTimeLimit: dto.sessionTimeLimit && dto.sessionTimeLimit > 0 ? dto.sessionTimeLimit : null,
       });
       settings = await this.settingsPrisonerRepository.save(prisonerSettings);
     } else {
@@ -141,8 +145,17 @@ export class SettingsService {
       return await this.settingsRouletteRepository.save(settings);
     } else if (settings instanceof SettingsGamePrisoner) {
       if (dto.userViewPoints !== undefined) settings.userViewPoints = dto.userViewPoints;
-      if (dto.limitRounds !== undefined) settings.limitRounds = dto.limitRounds;
-      if (dto.roundTimeLimit !== undefined) settings.roundTimeLimit = dto.roundTimeLimit;
+      // Mesma normalização do create: 0 em rodadas cai no default, 0 em tempo vira "sem limite".
+      if (dto.limitRounds !== undefined) {
+        settings.limitRounds = dto.limitRounds && dto.limitRounds > 0 ? dto.limitRounds : 10;
+      }
+      if (dto.roundTimeLimit !== undefined) {
+        settings.roundTimeLimit = dto.roundTimeLimit && dto.roundTimeLimit > 0 ? dto.roundTimeLimit : null;
+      }
+      if (dto.sessionTimeLimit !== undefined) {
+        settings.sessionTimeLimit =
+          dto.sessionTimeLimit && dto.sessionTimeLimit > 0 ? dto.sessionTimeLimit : null;
+      }
       return await this.settingsPrisonerRepository.save(settings);
     }
 

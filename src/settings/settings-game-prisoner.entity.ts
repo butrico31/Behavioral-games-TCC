@@ -11,4 +11,8 @@ export class SettingsGamePrisoner extends Settings {
 
   @Column({ name: 'roundtimelimit', type: 'int', default: null, nullable: true })
   roundTimeLimit!: number | null;
+
+  /** Tempo total da sessao em MINUTOS. null = sem limite. */
+  @Column({ name: 'sessiontimelimit', type: 'int', default: null, nullable: true })
+  sessionTimeLimit!: number | null;
 }

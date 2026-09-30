@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Match, MatchStatus } from '../match/match.entity';
+import { Session } from '../session/session.entity';
 import {
   PrisonerMatchState,
   PrisonerChoice,
@@ -10,6 +11,7 @@ import {
 import { SettingsGamePrisoner } from '../settings/settings-game-prisoner.entity';
 
 export type RoundTimeoutCallback = (matchId: string) => void;
+export type SessionEndCallback = (state: PrisonerMatchState) => void;
 
 @Injectable()
 export class PrisonerService {
@@ -17,14 +19,21 @@ export class PrisonerService {
   private static readonly BOOT_GRACE_MS = 1500;
   private readonly activeMatches = new Map<string, PrisonerMatchState>();
   private onRoundTimeout: RoundTimeoutCallback | null = null;
+  private onSessionEnd: SessionEndCallback | null = null;
 
   constructor(
     @InjectRepository(Match)
     private matchRepository: Repository<Match>,
+    @InjectRepository(Session)
+    private sessionRepository: Repository<Session>,
   ) {}
 
   setRoundTimeoutCallback(cb: RoundTimeoutCallback) {
     this.onRoundTimeout = cb;
+  }
+
+  setSessionEndCallback(cb: SessionEndCallback) {
+    this.onSessionEnd = cb;
   }
 
   async initMatch(matchId: string): Promise<PrisonerMatchState> {
@@ -52,8 +61,25 @@ export class PrisonerService {
       throw new BadRequestException('Match needs 2 players to start');
     }
 
+    if (!match.session.isActive) {
+      throw new BadRequestException('Esta sessão já foi encerrada pelo professor.');
+    }
+
+    // O prazo vem do banco (timestamptz), não de um contador em memória: sobrevive a reinício
+    // e vale igual para os dois jogadores, em qualquer relógio local.
+    const sessionDeadline = match.session.expires_at
+      ? new Date(match.session.expires_at).getTime()
+      : null;
+
+    if (sessionDeadline !== null && sessionDeadline <= Date.now()) {
+      throw new BadRequestException('O tempo desta sessão terminou.');
+    }
+
     const settings = match.session.settings as SettingsGamePrisoner;
-    const totalRounds = settings?.limitRounds ?? 10;
+    // O formulário do professor manda 0 quando o campo fica vazio, e `?? 10` não cobre 0:
+    // sem esta guarda, uma sessão salva assim gera partida de zero rodadas.
+    const limitRounds = settings?.limitRounds;
+    const totalRounds = limitRounds && limitRounds > 0 ? limitRounds : 10;
 
     const state: PrisonerMatchState = {
       matchId,
@@ -75,6 +101,11 @@ export class PrisonerService {
       roundTimeLimit: settings?.roundTimeLimit ?? null,
       roundTimer: null,
       roundDeadline: null,
+      sessionDeadline,
+      sessionTimer: null,
+      lastResolvedRound: 0,
+      endedReason: null,
+      interruptedRound: null,
       pausedRemainingMs: null,
       pausedRound: null,
     };
@@ -121,6 +152,7 @@ export class PrisonerService {
     if (!state.player1Ready || !state.player2Ready) return false;
 
     state.status = 'in_progress';
+    this.armSessionTimer(state);
 
     if (state.roundTimer === null && state.roundDeadline === null) {
       const resuming =
@@ -194,9 +226,7 @@ export class PrisonerService {
     if (bothChose) {
       this.clearRoundTimer(state);
       this.resolveRound(state);
-      if (state.status === 'in_progress') {
-        this.startRoundTimer(state, PrisonerService.REVEAL_GRACE_MS);
-      }
+      this.continueOrEndForSession(state);
       return { state, roundResolved: true };
     }
 
@@ -209,14 +239,20 @@ export class PrisonerService {
 
     const p1TimedOut = state.pendingChoices.player1 === undefined;
     const p2TimedOut = state.pendingChoices.player2 === undefined;
-    if (p1TimedOut) state.pendingChoices.player1 = 'defect';
-    if (p2TimedOut) state.pendingChoices.player2 = 'defect';
+    // Carta sorteada, e não fixa: se o tempo esgotado sempre virasse a mesma carta, toda rodada
+    // automática entraria no relatório como a mesma escolha e enviesaria o dado da pesquisa.
+    // O sorteio é independente por jogador; quem não escolheu fica marcado com timedOut.
+    if (p1TimedOut) state.pendingChoices.player1 = this.randomChoice();
+    if (p2TimedOut) state.pendingChoices.player2 = this.randomChoice();
 
     this.resolveRound(state, { player1: p1TimedOut, player2: p2TimedOut });
-    if (state.status === 'in_progress') {
-      this.startRoundTimer(state, PrisonerService.REVEAL_GRACE_MS);
-    }
+    this.continueOrEndForSession(state);
     return { state, roundResolved: true };
+  }
+
+  /** Carta automática do tempo esgotado: 50% preto, 50% vermelho, sorteada por jogador. */
+  private randomChoice(): PrisonerChoice {
+    return Math.random() < 0.5 ? 'cooperate' : 'defect';
   }
 
   private startRoundTimer(state: PrisonerMatchState, graceMs = 0): void {
@@ -248,6 +284,103 @@ export class PrisonerService {
     }, durationMs);
   }
 
+  /**
+   * Relógio da sessão. Um setTimeout por partida, com o prazo absoluto vindo do banco: se o
+   * processo reiniciar, o prazo continua valendo (o initMatch relê e recusa sessão vencida).
+   */
+  private armSessionTimer(state: PrisonerMatchState): void {
+    this.clearSessionTimer(state);
+    if (state.sessionDeadline === null || state.status !== 'in_progress') return;
+
+    const remaining = Math.max(0, state.sessionDeadline - Date.now());
+    state.sessionTimer = setTimeout(() => {
+      state.sessionTimer = null;
+      if (state.status !== 'in_progress') return;
+      this.endBySession(state, 'tempo_sessao', true, true);
+    }, remaining);
+  }
+
+  private clearSessionTimer(state: PrisonerMatchState): void {
+    if (state.sessionTimer) {
+      clearTimeout(state.sessionTimer);
+      state.sessionTimer = null;
+    }
+  }
+
+  /** Só abre a próxima rodada se ela couber inteira no prazo: assim a sessão termina ENTRE rodadas. */
+  private nextRoundFitsSession(state: PrisonerMatchState): boolean {
+    if (state.sessionDeadline === null) return true;
+
+    const now = Date.now();
+    if (now >= state.sessionDeadline) return false;
+    // Rodada livre não tem duração prevista: deixa correr e quem encerra é o relógio da sessão.
+    if (!state.roundTimeLimit || state.roundTimeLimit <= 0) return true;
+
+    const proxima = PrisonerService.REVEAL_GRACE_MS + state.roundTimeLimit * 1000;
+    return now + proxima <= state.sessionDeadline;
+  }
+
+  private continueOrEndForSession(state: PrisonerMatchState): void {
+    if (state.status !== 'in_progress') return;
+
+    if (this.nextRoundFitsSession(state)) {
+      this.startRoundTimer(state, PrisonerService.REVEAL_GRACE_MS);
+      return;
+    }
+    // Entre rodadas: nada é descartado, a partida apenas não abre a próxima. Quem avisa os
+    // jogadores é o emitRoundOutcome, que já vai ver status 'finished'.
+    this.endBySession(state, 'tempo_sessao', false, false);
+  }
+
+  /**
+   * Encerra a partida por causa da sessão. A rodada aberta é DESCARTADA, nunca completada:
+   * forceResolveRound preencheria com 'defect' e pontuaria, e o relatório diria que alguém
+   * traiu quando na verdade acabou o tempo.
+   */
+  private endBySession(
+    state: PrisonerMatchState,
+    reason: 'tempo_sessao' | 'sessao_encerrada',
+    midRound: boolean,
+    notify: boolean,
+  ): PrisonerMatchState {
+    this.clearRoundTimer(state);
+    this.clearSessionTimer(state);
+
+    if (midRound) {
+      const rodadaAberta = state.currentRound > state.lastResolvedRound;
+      state.interruptedRound = rodadaAberta ? state.currentRound : null;
+      state.pendingChoices = {};
+    }
+
+    state.status = 'finished';
+    state.endedReason = reason;
+
+    // Sem isto a partida encerrava mas a sessão continuava ativa na tela da professora, e ela
+    // teria de encerrar na mão uma sessão que o próprio prazo já tinha vencido.
+    if (reason === 'tempo_sessao') {
+      this.sessionRepository
+        .update(
+          { id: state.sessionId, isActive: true },
+          { isActive: false, finished_at: new Date(), finished_reason: 'tempo' },
+        )
+        .catch((err) => console.error(`[Prisoner] Falha ao encerrar a sessão ${state.sessionId}:`, err));
+    }
+
+    if (notify) this.onSessionEnd?.(state);
+    return state;
+  }
+
+  /** Chamado quando a professora encerra a sessão: sem isto, as partidas seguiriam vivas. */
+  endMatchesOfSession(sessionId: string, reason: 'tempo_sessao' | 'sessao_encerrada'): number {
+    let encerradas = 0;
+    for (const state of this.activeMatches.values()) {
+      if (state.sessionId !== sessionId || state.status !== 'in_progress') continue;
+      this.endBySession(state, reason, true, true);
+      encerradas++;
+    }
+    return encerradas;
+  }
+
   private clearRoundTimer(state: PrisonerMatchState): void {
     if (state.roundTimer) {
       clearTimeout(state.roundTimer);
@@ -277,9 +410,11 @@ export class PrisonerService {
     };
 
     state.pendingChoices = {};
+    state.lastResolvedRound = state.currentRound;
 
     if (state.currentRound >= state.totalRounds) {
       state.status = 'finished';
+      state.endedReason = 'rodadas';
     } else {
       state.currentRound++;
     }
@@ -288,12 +423,15 @@ export class PrisonerService {
   async finalizeMatch(matchId: string): Promise<Match> {
     const state = this.getState(matchId);
     this.clearRoundTimer(state);
+    this.clearSessionTimer(state);
 
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match) throw new NotFoundException(`Match ${matchId} not found`);
 
     match.moves = state.moves as any;
     match.status = MatchStatus.FINALIZADA;
+    match.endedReason = state.endedReason ?? 'rodadas';
+    match.interruptedRound = state.interruptedRound ?? null;
     const saved = await this.matchRepository.save(match);
 
     this.activeMatches.delete(matchId);
@@ -304,6 +442,9 @@ export class PrisonerService {
     matchId: string;
     moves: Record<string, unknown>;
     finalScore: { player1: number; player2: number };
+    endedReason: string;
+    roundsPlayed: number;
+    interruptedRound: number | null;
   } | null> {
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match || match.status !== MatchStatus.FINALIZADA) return null;
@@ -320,7 +461,14 @@ export class PrisonerService {
       player2 += move.player2Points ?? 0;
     }
 
-    return { matchId, moves, finalScore: { player1, player2 } };
+    return {
+      matchId,
+      moves,
+      finalScore: { player1, player2 },
+      endedReason: match.endedReason ?? 'rodadas',
+      roundsPlayed: Object.keys(moves).length,
+      interruptedRound: match.interruptedRound ?? null,
+    };
   }
 
   getState(matchId: string): PrisonerMatchState {

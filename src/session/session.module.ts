@@ -8,6 +8,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { UsersModule } from '../users/users.module';
 import { Player } from '../player/player.entity';
 import { Match } from '../match/match.entity';
+import { PrisonerModule } from '../prisoner/prisoner.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Match } from '../match/match.entity';
     GameModule,
     SettingsModule,
     UsersModule,
+    PrisonerModule,
   ],
   controllers: [SessionController],
   providers: [SessionService],

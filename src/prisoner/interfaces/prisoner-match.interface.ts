@@ -11,6 +11,16 @@ export interface PrisonerRoundResult {
 
 export type PrisonerMoves = Record<string, PrisonerRoundResult>;
 
+/**
+ * Rodada como ela vai para UM jogador: com userViewPoints desligado, os pontos do outro
+ * jogador saem como null. O que fica gravado em PrisonerMoves continua completo, então o
+ * resultado final e o relatório do professor não mudam.
+ */
+export type PrisonerRoundResultView = Omit<PrisonerRoundResult, 'player1Points' | 'player2Points'> & {
+  player1Points: number | null;
+  player2Points: number | null;
+};
+
 export interface PrisonerMatchState {
   matchId: string;
   sessionId: string;
@@ -33,6 +43,14 @@ export interface PrisonerMatchState {
   userViewPoints: boolean;
   roundTimeLimit: number | null;
   roundTimer: ReturnType<typeof setTimeout> | null;
+  /** Fim da sessão (epoch ms), vindo de sessions.expires_at. null = sessão sem tempo. */
+  sessionDeadline: number | null;
+  sessionTimer: ReturnType<typeof setTimeout> | null;
+  /** Última rodada que fechou com pontos — é o que o relatório chama de "rodadas jogadas". */
+  lastResolvedRound: number;
+  endedReason: 'rodadas' | 'tempo_sessao' | 'sessao_encerrada' | null;
+  /** Rodada que estava aberta quando a sessão acabou: entra no relatório sem pontos. */
+  interruptedRound: number | null;
   roundDeadline: number | null;
   pausedRemainingMs: number | null;
   pausedRound: number | null;

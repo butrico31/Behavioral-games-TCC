@@ -15,7 +15,12 @@ import { JoinPrisonerMatchDto } from './dto/join-prisoner-match.dto';
 import { PlayerReadyDto } from './dto/player-ready.dto';
 import { SubmitChoiceDto } from './dto/submit-choice.dto';
 import { ParseSocketBodyPipe } from '../common/pipes/parse-socket-body.pipe';
-import { PrisonerMatchState, PRISONER_PAYOFF } from './interfaces/prisoner-match.interface';
+import {
+  PrisonerMatchState,
+  PrisonerRoundResult,
+  PrisonerRoundResultView,
+  PRISONER_PAYOFF,
+} from './interfaces/prisoner-match.interface';
 
 @WebSocketGateway({ namespace: '/prisoner', cors: { origin: '*' } })
 export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -30,6 +35,30 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         console.error(`[Prisoner] Falha ao resolver timeout da match ${matchId}:`, err);
       });
     });
+
+    // Fim do tempo da sessão (ou encerramento pela professora): a partida já foi encerrada no
+    // serviço; aqui só grava o que foi jogado e avisa os dois jogadores.
+    this.prisonerService.setSessionEndCallback((state) => {
+      this.finishAndAnnounce(state).catch((err) => {
+        console.error(`[Prisoner] Falha ao encerrar a match ${state.matchId} pela sessão:`, err);
+      });
+    });
+  }
+
+  /** Único lugar que finaliza e anuncia: fim natural das rodadas e fim por sessão passam por aqui. */
+  private async finishAndAnnounce(state: PrisonerMatchState) {
+    await this.prisonerService.finalizeMatch(state.matchId);
+    this.server.to(state.matchId).emit('matchFinished', {
+      matchId: state.matchId,
+      moves: state.moves,
+      finalScore: {
+        player1: state.player1TotalPoints,
+        player2: state.player2TotalPoints,
+      },
+      endedReason: state.endedReason ?? 'rodadas',
+      roundsPlayed: state.lastResolvedRound,
+      interruptedRound: state.interruptedRound ?? null,
+    });
   }
 
   private emitRoundStart(state: PrisonerMatchState) {
@@ -38,6 +67,7 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       round: state.currentRound,
       totalRounds: state.totalRounds,
       roundEndsAt: state.roundDeadline,
+      sessionEndsAt: state.sessionDeadline,
       serverNow: Date.now(),
     });
   }
@@ -53,6 +83,7 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       player1Id: state.player1Id,
       player2Id: state.player2Id,
       totalRounds: state.totalRounds,
+      sessionEndsAt: state.sessionDeadline,
       payoff: PRISONER_PAYOFF,
       ready: {
         player1: state.player1Ready,
@@ -82,6 +113,7 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           player2: state.pendingChoices.player2 !== undefined,
         },
         roundEndsAt: state.roundDeadline,
+        sessionEndsAt: state.sessionDeadline,
         serverNow: Date.now(),
       });
     };
@@ -99,9 +131,23 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     };
   }
 
+  // Irmão do totalPointsFor para a rodada: com a configuração desligada, os pontos do outro
+  // jogador não saem nem no payload — esconder só na tela deixaria o número no DevTools e
+  // somando rodada a rodada o jogador reconstruiria o placar que o topo esconde.
+  private roundResultFor(
+    state: PrisonerMatchState,
+    result: PrisonerRoundResult | undefined,
+    isPlayer1: boolean,
+  ): PrisonerRoundResultView | undefined {
+    if (!result || state.userViewPoints) return result;
+    return { ...result, ...(isPlayer1 ? { player2Points: null } : { player1Points: null }) };
+  }
+
   private async emitRoundOutcome(state: PrisonerMatchState, timedOut: boolean) {
     const finished = state.status === 'finished';
-    const roundNumber = finished ? state.totalRounds : state.currentRound - 1;
+    // Com fim por tempo de sessão o jogo pode terminar antes da última rodada, então o número
+    // vem da rodada que realmente fechou.
+    const roundNumber = state.lastResolvedRound;
     const result = state.moves[String(roundNumber)];
 
     if (timedOut) {
@@ -115,7 +161,7 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       if (!socketId) return;
       this.server.to(socketId).emit('roundResult', {
         round: roundNumber,
-        result,
+        result: this.roundResultFor(state, result, isPlayer1),
         totalPoints: this.totalPointsFor(state, isPlayer1),
         nextRound: finished ? null : state.currentRound,
         timedOut,
@@ -125,15 +171,7 @@ export class PrisonerGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     sendResult(state.player2SocketId, false);
 
     if (finished) {
-      await this.prisonerService.finalizeMatch(state.matchId);
-      this.server.to(state.matchId).emit('matchFinished', {
-        matchId: state.matchId,
-        moves: state.moves,
-        finalScore: {
-          player1: state.player1TotalPoints,
-          player2: state.player2TotalPoints,
-        },
-      });
+      await this.finishAndAnnounce(state);
     } else {
       this.emitRoundStart(state);
     }
