@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Brain } from "lucide-react"
 
 /** Fundo e cabeçalho compartilhados pelas telas da partida (padrão claro do BehaviorLab). */
-export function MatchShell({ children }: { children: ReactNode }) {
+export function MatchShell({ children, notice }: { children: ReactNode; notice?: ReactNode }) {
   return (
     // --font-display redefinido aqui: o index.css aplica var(--font-display) (Fraunces) em h1-h4.
     // h-dvh + overflow-hidden: a página nunca rola; cada tela cabe na altura ou rola só o bloco que precisa.
@@ -19,6 +19,7 @@ export function MatchShell({ children }: { children: ReactNode }) {
           </span>
           <span className="text-lg font-extrabold tracking-tight text-white">BehaviorLab</span>
         </div>
+        {notice}
       </header>
 
       <main className="relative z-[1] flex min-h-0 flex-1 items-center justify-center px-6 pb-[clamp(12px,3dvh,40px)]">

@@ -136,6 +136,7 @@ export function useMatchRoom(sessionId: string) {
 
   return {
     phase,
+    sessionEndsAt: check?.sessionEndsAt ?? null,
     payoff: check ? toPayoffTable(check.payoff) : undefined,
     opponentReady,
     confirmReady,

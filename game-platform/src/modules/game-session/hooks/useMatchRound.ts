@@ -11,13 +11,15 @@ import {
   type Card,
   type MatchReadyData,
   type MatchResult,
-  type PayoffPair,
+  type RoundPointsView,
   type ReadyCheckData,
   type RoundMoves,
+  type RoundMovesView,
   type RoundPhase,
   type RoundRecord,
   type RoundResultData,
   type RoundStartData,
+  type MatchEndedReason,
 } from "../types"
 
 /**
@@ -50,11 +52,19 @@ type View = {
   youScore: number
   /** null quando a sessão esconde os pontos do outro jogador. */
   oppScore: number | null
+  /** Configuração da sessão: false esconde a pontuação do oponente durante a partida. */
+  userViewPoints: boolean
   yourCard: Card | null
   opponentCard: Card | null
-  roundPoints: PayoffPair | null
+  roundPoints: RoundPointsView | null
   playedByTime: boolean
   history: RoundRecord[]
+  /** Fim da sessão (epoch ms); null quando a sessão não tem tempo. */
+  sessionEndsAt: number | null
+  endedReason: MatchEndedReason
+  /** Rodadas que fecharam com pontos (pode ser menos que o total, se o tempo acabou). */
+  roundsPlayed: number
+  interruptedRound: number | null
   lastResultRound: number
   opponentAway: boolean
 }
@@ -79,11 +89,16 @@ const EMPTY_VIEW: View = {
   clockOffset: 0,
   youScore: 0,
   oppScore: 0,
+  userViewPoints: true,
   yourCard: null,
   opponentCard: null,
   roundPoints: null,
   playedByTime: false,
   history: [],
+  sessionEndsAt: null,
+  endedReason: 'rodadas',
+  roundsPlayed: 0,
+  interruptedRound: null,
   lastResultRound: 0,
   opponentAway: false,
 }
@@ -93,12 +108,14 @@ function clockOffsetOf(d: { serverNow?: number; receivedAt?: number }, fallback:
 }
 
 /** Traduz uma rodada do servidor (player1/player2) para o ponto de vista deste jogador. */
-function toRecord(isPlayer1: boolean, round: number, m: RoundMoves): RoundRecord {
+function toRecord(isPlayer1: boolean, round: number, m: RoundMoves | RoundMovesView): RoundRecord {
   return {
     round,
     yourCard: cardForChoice(isPlayer1 ? m.player1Choice : m.player2Choice),
     opponentCard: cardForChoice(isPlayer1 ? m.player2Choice : m.player1Choice),
-    points: isPlayer1 ? [m.player1Points, m.player2Points] : [m.player2Points, m.player1Points],
+    points: isPlayer1
+      ? [m.player1Points ?? 0, m.player2Points]
+      : [m.player2Points ?? 0, m.player1Points],
     byTime: !!(isPlayer1 ? m.player1TimedOut : m.player2TimedOut),
   }
 }
@@ -119,6 +136,8 @@ function applyEvent(v: View, e: ServerEvent): View {
         totalRounds: d.totalRounds,
         phase: pending ? "waiting" : "choose",
         secondsPerRound: d.roundTimeLimit ?? 0,
+        userViewPoints: d.userViewPoints ?? v.userViewPoints,
+        sessionEndsAt: d.sessionEndsAt ?? v.sessionEndsAt,
         deadline: d.roundEndsAt ?? null,
         clockOffset: clockOffsetOf(d, v.clockOffset),
         youScore: d.totalPoints?.[mine] ?? v.youScore,
@@ -141,6 +160,7 @@ function applyEvent(v: View, e: ServerEvent): View {
         totalRounds: d.totalRounds || v.totalRounds,
         deadline: d.roundEndsAt ?? null,
         clockOffset: clockOffsetOf(d, v.clockOffset),
+        sessionEndsAt: d.sessionEndsAt ?? v.sessionEndsAt,
         opponentAway: false,
         ...(newRound
           ? { phase: "choose" as const, yourCard: null, opponentCard: null, roundPoints: null, playedByTime: false }
@@ -188,6 +208,9 @@ function applyEvent(v: View, e: ServerEvent): View {
         history: Object.entries(d.moves)
           .map(([round, m]) => toRecord(v.isPlayer1, Number(round), m))
           .sort((a, b) => a.round - b.round),
+        endedReason: d.endedReason ?? 'rodadas',
+        roundsPlayed: d.roundsPlayed ?? Object.keys(d.moves).length,
+        interruptedRound: d.interruptedRound ?? null,
         opponentAway: false,
       }
     }
@@ -386,11 +409,16 @@ export function useMatchRound() {
     secondsPerRound: view.secondsPerRound,
     youScore: view.youScore,
     oppScore: view.oppScore,
+    userViewPoints: view.userViewPoints,
     yourCard: view.yourCard,
     opponentCard: view.opponentCard,
     roundPoints: view.roundPoints,
     playedByTime: view.playedByTime,
     history: view.history,
+    sessionEndsAt: view.sessionEndsAt,
+    endedReason: view.endedReason,
+    roundsPlayed: view.roundsPlayed,
+    interruptedRound: view.interruptedRound,
     opponentAway: view.opponentAway,
     toast,
     pick,

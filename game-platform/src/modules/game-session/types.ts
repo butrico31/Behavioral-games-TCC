@@ -163,11 +163,17 @@ export type Card = 'B' | 'R'
 
 export type RoundPhase = 'choose' | 'waiting' | 'reveal'
 
+/**
+ * [seus pontos, pontos do outro jogador]. O segundo vem null durante a partida quando a
+ * sessão esconde a pontuação do oponente; no resultado final os dois sempre vêm.
+ */
+export type RoundPointsView = [number, number | null]
+
 export type RoundRecord = {
   round: number
   yourCard: Card
   opponentCard: Card
-  points: PayoffPair
+  points: RoundPointsView
   /** true quando a carta foi jogada automaticamente por tempo esgotado. */
   byTime?: boolean
 }
@@ -215,12 +221,24 @@ export interface RoundMoves {
   player2TimedOut?: boolean
 }
 
+/**
+ * A rodada como chega no roundResult: com a pontuação do oponente escondida, o servidor manda
+ * os pontos dele como null. O `moves` do matchFinished continua completo (RoundMoves), por isso
+ * o resultado final não depende desta versão mascarada.
+ */
+export type RoundMovesView = Omit<RoundMoves, 'player1Points' | 'player2Points'> & {
+  player1Points: number | null
+  player2Points: number | null
+}
+
 /** Enviado enquanto os dois estão nas regras, até ambos confirmarem. */
 export interface ReadyCheckData {
   matchId: string
   player1Id: string
   player2Id: string
   totalRounds: number
+  /** Fim da sessão (epoch ms); null quando a sessão não tem tempo. */
+  sessionEndsAt?: number | null
   payoff: ServerPayoff
   ready: { player1: boolean; player2: boolean }
   connected: { player1: boolean; player2: boolean }
@@ -239,6 +257,7 @@ export interface MatchReadyData {
   totalPoints?: { player1: number | null; player2: number | null }
   pendingChoices?: { player1: boolean; player2: boolean }
   roundEndsAt?: number | null
+  sessionEndsAt?: number | null
   serverNow?: number
   /** Horário local de chegada, para compensar a diferença de relógio com o servidor. */
   receivedAt?: number
@@ -248,13 +267,14 @@ export interface RoundStartData {
   round: number
   totalRounds: number
   roundEndsAt: number | null
+  sessionEndsAt?: number | null
   serverNow: number
   receivedAt?: number
 }
 
 export interface RoundResultData {
   round: number
-  result: RoundMoves
+  result: RoundMovesView
   totalPoints: { player1: number | null; player2: number | null }
   nextRound: number | null
   timedOut: boolean
@@ -264,4 +284,11 @@ export interface MatchResult {
   matchId: string
   finalScore: { player1: number; player2: number }
   moves: Record<string, RoundMoves>
+  /** 'rodadas' (fim natural), 'tempo_sessao' ou 'sessao_encerrada'. */
+  endedReason?: MatchEndedReason
+  roundsPlayed?: number
+  /** Rodada que estava aberta quando a sessão acabou: sem pontos. */
+  interruptedRound?: number | null
 }
+
+export type MatchEndedReason = 'rodadas' | 'tempo_sessao' | 'sessao_encerrada'

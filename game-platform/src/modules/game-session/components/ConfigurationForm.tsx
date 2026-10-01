@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { humanizeLabel } from '../../../shared/utils/humanizeLabel'
+import { CONFIG_FIELD_HINTS_PT, CONFIG_FIELD_LABELS_PT } from '../constants/configFieldLabels'
 import type { CreateConfigPayload, GameConfigFieldDefinition } from '../types'
 
 function Toggle({ value, onToggle }: { value: boolean; onToggle: (v: boolean) => void }) {
@@ -61,14 +62,16 @@ export function ConfigurationForm({
   const render_field = (field: GameConfigFieldDefinition) => {
     if (field.name === 'game') return null
 
-    const field_label = humanizeLabel(field.name)
+    const field_label = CONFIG_FIELD_LABELS_PT[field.name] ?? humanizeLabel(field.name)
+    const field_hint = CONFIG_FIELD_HINTS_PT[field.name]
     const field_value = config[field.name]
 
     if (field.type === 'boolean') {
       return (
         <div key={field.name} className="surface-subtle flex items-center justify-between p-4">
-          <div>
+          <div className="pr-4">
             <p className="text-sm font-medium text-foreground">{field_label}</p>
+            {field_hint && <p className="text-xs text-muted-foreground mt-1">{field_hint}</p>}
           </div>
           <Toggle
             value={Boolean(field_value)}
@@ -85,10 +88,13 @@ export function ConfigurationForm({
           <input
             id={`config-${field.name}`}
             type="number"
-            value={typeof field_value === 'number' ? field_value : 0}
-            onChange={(e) => handleChange(field.name, Number(e.target.value))}
+            min={0}
+            placeholder="Sem limite"
+            value={typeof field_value === 'number' && field_value > 0 ? field_value : ''}
+            onChange={(e) => handleChange(field.name, e.target.value === '' ? 0 : Number(e.target.value))}
             className={input_class}
           />
+          {field_hint && <p className="text-xs text-muted-foreground mt-1">{field_hint}</p>}
         </div>
       )
     }
