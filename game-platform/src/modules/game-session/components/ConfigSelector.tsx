@@ -3,6 +3,8 @@ import { ChevronDown, ListChecks, PlusCircle, Gamepad2, Trash2 } from 'lucide-re
 import { ConfigurationForm } from './ConfigurationForm'
 import { useClickOutside } from '../../../shared/hooks/useClickOutside'
 import { humanizeLabel } from '../../../shared/utils/humanizeLabel'
+import { CONFIG_FIELD_LABELS_PT, GAME_LABELS_PT } from '../constants/configFieldLabels'
+import { format_config_value } from '../utils/configValue'
 import type { CreateConfigPayload, GameConfig, GameConfigFieldDefinition } from '../types'
 
 interface ConfigSelectorProps {
@@ -55,12 +57,7 @@ export function ConfigSelector({
     ? Object.entries(selected_config).filter(([key]) => !['id', 'createdAt', 'game'].includes(key))
     : []
 
-  const safe_value = (value: unknown): string => {
-    if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
-    if (typeof value === 'number') return String(value)
-    if (typeof value === 'string') return value
-    return '-'
-  }
+  const game_label = GAME_LABELS_PT[selected_game] ?? humanizeLabel(selected_game)
 
   return (
     <section
@@ -75,7 +72,7 @@ export function ConfigSelector({
       </div>
       <p className="text-muted-foreground text-sm mb-6">
         Parâmetros do jogo{' '}
-        <span className="text-primary font-semibold capitalize">{selected_game}</span>
+        <span className="text-primary font-semibold">{game_label}</span>
       </p>
 
       {/* Mode Toggle */}
@@ -115,7 +112,7 @@ export function ConfigSelector({
         <div>
           <label htmlFor="config-select" className="block text-sm font-medium text-foreground mb-2">
             Selecione uma configuração para{' '}
-            <span className="capitalize text-primary">{selected_game}</span>
+            <span className="text-primary">{game_label}</span>
           </label>
           <div ref={dropdown_ref} className="relative">
             <button
@@ -204,8 +201,10 @@ export function ConfigSelector({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {preview_entries.map(([key, value]) => (
                   <div key={key}>
-                    <p className="text-xs text-muted-foreground">{humanizeLabel(key)}</p>
-                    <p className="text-sm text-foreground font-medium">{safe_value(value)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {CONFIG_FIELD_LABELS_PT[key] ?? humanizeLabel(key)}
+                    </p>
+                    <p className="text-sm text-foreground font-medium">{format_config_value(value)}</p>
                   </div>
                 ))}
               </div>
@@ -216,7 +215,7 @@ export function ConfigSelector({
             <div className="surface-subtle mt-4 p-4 text-center">
               <p className="text-muted-foreground text-sm">
                 Nenhuma configuração encontrada para{' '}
-                <span className="capitalize font-medium">{selected_game}</span>. Crie uma nova.
+                <span className="font-medium">{game_label}</span>. Crie uma nova.
               </p>
             </div>
           )}

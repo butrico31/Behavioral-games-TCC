@@ -21,9 +21,14 @@ export const CONFIG_FIELD_LABELS_PT: Record<string, string> = {
 /** Texto de apoio abaixo do campo. O vazio tem significado, então precisa estar escrito. */
 export const CONFIG_FIELD_HINTS_PT: Record<string, string> = {
   limitRounds: 'Deixe vazio para usar 10 rodadas.',
-  roundTimeLimit: 'Deixe vazio para rodadas sem tempo, no ritmo dos jogadores.',
   sessionTimeLimit:
     'Conta a partir da entrada do primeiro jogador. Ao acabar, as partidas encerram com as rodadas já jogadas. Vazio = sem limite.',
   userViewPoints:
     'Desligado, o jogador não vê os pontos do outro durante a partida. O resultado final continua mostrando tudo.'
+}
+
+/** Id do jogo (vem cru da API, ex. "prisoner") -> nome exibido. */
+export const GAME_LABELS_PT: Record<string, string> = {
+  prisoner: 'Dilema do Prisioneiro',
+  roulette: 'Roleta'
 }

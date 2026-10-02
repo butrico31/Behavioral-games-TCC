@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PlusCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PlusCircle } from 'lucide-react'
 import { Header } from '../../../shared/components/Header'
 import { Toast } from '../../../shared/components/Toast'
 import { SessionCodeModal } from '../components/SessionCodeModal'
@@ -16,6 +16,7 @@ import { useConfigs } from '../hooks/useConfigs'
 import { useGameConfigFields } from '../hooks/useGameConfigFields'
 import { useCreateSession } from '../hooks/useCreateSession'
 import { useAuth } from '../../auth/hooks/useAuth'
+import { PLAYER_FIELD_DEPENDENTS } from '../constants/playerFieldDependencies'
 import type {
   CreateConfigPayload,
   CreateSessionPayload,
@@ -75,6 +76,7 @@ const extract_invite_code = (response: CreateSessionResponse): string | null => 
 export function CreateSessionPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [current_step, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [create_error, setCreateError] = useState<string | null>(null)
   const page_ref = useRef<HTMLDivElement | null>(null)
   const { toast, showToast } = useToast()
@@ -164,7 +166,7 @@ export function CreateSessionPage() {
 
   useGsapReveal(
     '[data-create-section="title"], [data-create-section="form"], [data-create-section="config"], [data-create-section="summary"]',
-    { root: page_ref, y: 18, duration: 0.55, stagger: 0.09 }
+    { root: page_ref, y: 18, duration: 0.55, stagger: 0.09, deps: [current_step] }
   )
 
   useEffect(() => {
@@ -216,6 +218,8 @@ export function CreateSessionPage() {
 
   const can_create_session = can_create_session_base && active_config !== null
   const is_creating = is_creating_config || is_creating_session
+  const step1_valid = can_create_session_base
+  const step2_valid = active_config !== null
 
   const session_settings = useMemo(() => {
     if (!active_config) return null
@@ -277,6 +281,21 @@ export function CreateSessionPage() {
     }
   }
 
+  const handleTogglePlayerInfo = (field: string) => {
+    const is_deselecting = state.input_info.includes(field)
+    const dependents = PLAYER_FIELD_DEPENDENTS[field]
+
+    if (is_deselecting && dependents?.length) {
+      const next_input_info = state.input_info.filter(
+        (f) => f !== field && !dependents.includes(f)
+      )
+      dispatch({ type: 'SET_PLAYER_INFO', payload: next_input_info })
+      return
+    }
+
+    dispatch({ type: 'TOGGLE_PLAYER_INFO', payload: field })
+  }
+
   const handleDeleteConfig = async (id: string) => {
     const target = configs.find((config) => config.id === id)
     const target_name = target?.configName ?? 'esta configuração'
@@ -304,70 +323,129 @@ export function CreateSessionPage() {
       <Header />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
-        <div data-create-section="title" className="surface-panel mb-8 px-6 py-7 md:px-10 md:py-8">
-          <p className="heading-kicker mb-2">Fluxo orientado</p>
-          <div className="mb-3 flex items-center gap-3">
-            <PlusCircle className="h-9 w-9 text-primary" />
-            <h1 className="text-4xl text-foreground md:text-5xl">Criar Nova Sessão</h1>
+        {current_step === 1 && (
+          <div data-create-section="title" className="surface-panel mb-8 px-6 py-7 md:px-10 md:py-8">
+            <div className="mb-3 flex items-center gap-3">
+              <PlusCircle className="h-9 w-9 text-primary" />
+              <h1 className="text-4xl text-foreground md:text-5xl">Criar Nova Sessão</h1>
+            </div>
+            <p className="max-w-3xl text-sm text-muted-foreground md:text-base">
+              Defina os dados da sessão, configure a partida e comece
+            </p>
           </div>
-          <p className="max-w-3xl text-sm text-muted-foreground md:text-base">
-            Defina os dados da sessão, configure a partida e comece
-          </p>
-        </div>
+        )}
 
-        <div data-create-section="form">
-          <SessionDataForm
-            session_name={state.session_name}
-            selected_game={state.selected_game}
-            games={games}
-            games_loading={games_loading}
-            games_error={games_error}
-            player_field_options={player_field_options}
-            player_fields_loading={player_fields_loading}
-            player_fields_error={player_fields_error}
-            input_info={state.input_info}
-            onSessionNameChange={(value) => dispatch({ type: 'SET_SESSION_NAME', payload: value })}
-            onGameChange={(value) => dispatch({ type: 'SET_GAME', payload: value })}
-            onTogglePlayerInfo={(field) => dispatch({ type: 'TOGGLE_PLAYER_INFO', payload: field })}
-          />
-        </div>
+        {current_step === 1 && (
+          <div data-create-section="form">
+            <p className="heading-kicker mb-2">Etapa 1 de 3</p>
+            <SessionDataForm
+              session_name={state.session_name}
+              selected_game={state.selected_game}
+              games={games}
+              games_loading={games_loading}
+              games_error={games_error}
+              player_field_options={player_field_options}
+              player_fields_loading={player_fields_loading}
+              player_fields_error={player_fields_error}
+              input_info={state.input_info}
+              onSessionNameChange={(value) => dispatch({ type: 'SET_SESSION_NAME', payload: value })}
+              onGameChange={(value) => dispatch({ type: 'SET_GAME', payload: value })}
+              onTogglePlayerInfo={handleTogglePlayerInfo}
+            />
+            <div className="mt-6 flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                disabled={!step1_valid}
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Continuar
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {!step1_valid && (
+                <p className="text-xs text-muted-foreground">
+                  Preencha o nome da sessão e selecione ao menos um dado do jogador para continuar.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
-        <div data-create-section="config" className="relative z-20">
-          <ConfigSelector
-            selected_game={state.selected_game}
-            config_mode={state.config_mode}
-            selected_config={selected_config}
-            selected_config_id={state.selected_config_id}
-            configs_for_game={configs}
-            configs_loading={configs_loading}
-            configs_error={configs_error}
-            new_config={state.new_config}
-            common_fields={common_fields}
-            game_fields={game_fields}
-            fields_loading={fields_loading}
-            fields_error={fields_error}
-            is_deleting_config={is_deleting_config}
-            deleting_config_id={deleting_id}
-            onDeleteConfig={handleDeleteConfig}
-            onConfigModeChange={(mode) => dispatch({ type: 'SET_CONFIG_MODE', payload: mode })}
-            onSelectConfig={(id) => dispatch({ type: 'SELECT_CONFIG', payload: id })}
-            onNewConfigChange={(config) => dispatch({ type: 'UPDATE_NEW_CONFIG', payload: config })}
-          />
-        </div>
+        {current_step === 2 && (
+          <div data-create-section="config" className="relative z-20">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
+            <p className="heading-kicker mb-2">Etapa 2 de 3</p>
+            <ConfigSelector
+              selected_game={state.selected_game}
+              config_mode={state.config_mode}
+              selected_config={selected_config}
+              selected_config_id={state.selected_config_id}
+              configs_for_game={configs}
+              configs_loading={configs_loading}
+              configs_error={configs_error}
+              new_config={state.new_config}
+              common_fields={common_fields}
+              game_fields={game_fields}
+              fields_loading={fields_loading}
+              fields_error={fields_error}
+              is_deleting_config={is_deleting_config}
+              deleting_config_id={deleting_id}
+              onDeleteConfig={handleDeleteConfig}
+              onConfigModeChange={(mode) => dispatch({ type: 'SET_CONFIG_MODE', payload: mode })}
+              onSelectConfig={(id) => dispatch({ type: 'SELECT_CONFIG', payload: id })}
+              onNewConfigChange={(config) => dispatch({ type: 'UPDATE_NEW_CONFIG', payload: config })}
+            />
+            <div className="mt-6 flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(3)}
+                disabled={!step2_valid}
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Continuar
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {!step2_valid && (
+                <p className="text-xs text-muted-foreground">
+                  Selecione ou crie uma configuração de partida para continuar.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
-        <div data-create-section="summary" className="relative z-10">
-          <SessionSummary
-            session_name={state.session_name}
-            selected_game={state.selected_game}
-            input_info={state.input_info}
-            active_config={active_config}
-            config_mode={state.config_mode}
-            can_create_session={can_create_session}
-            is_creating={is_creating}
-            create_error={create_error}
-            onCreateSession={handleCreateSession}
-          />
-        </div>
+        {current_step === 3 && (
+          <div data-create-section="summary" className="relative z-10">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(2)}
+              className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
+            <p className="heading-kicker mb-2">Etapa 3 de 3</p>
+            <SessionSummary
+              session_name={state.session_name}
+              selected_game={state.selected_game}
+              input_info={state.input_info}
+              player_field_options={player_field_options}
+              active_config={active_config}
+              config_mode={state.config_mode}
+              can_create_session={can_create_session}
+              is_creating={is_creating}
+              create_error={create_error}
+              onCreateSession={handleCreateSession}
+            />
+          </div>
+        )}
       </main>
 
       {/* Session Code Modal */}

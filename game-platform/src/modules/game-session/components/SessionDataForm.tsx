@@ -1,4 +1,5 @@
 import { ChevronDown, Users } from 'lucide-react'
+import { PLAYER_FIELD_DEPENDENTS } from '../constants/playerFieldDependencies'
 import type { GameCatalogItem } from '../types'
 import type { PlayerInfoOption } from '../types'
 
@@ -31,6 +32,24 @@ export function SessionDataForm({
   onGameChange,
   onTogglePlayerInfo
 }: SessionDataFormProps) {
+  const dependent_values = new Set(Object.values(PLAYER_FIELD_DEPENDENTS).flat())
+  const independent_options = player_field_options.filter((opt) => !dependent_values.has(opt.value))
+
+  const render_option = (opt: PlayerInfoOption) => (
+    <button
+      key={opt.value}
+      type="button"
+      onClick={() => onTogglePlayerInfo(opt.value)}
+      className={`px-4 py-2 rounded-lg border font-medium text-sm transition-all ${
+        input_info.includes(opt.value)
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-secondary/45 text-muted-foreground border-border hover:border-primary hover:text-foreground'
+      }`}
+    >
+      {opt.label}
+    </button>
+  )
+
   return (
     <section
       className="surface-panel mb-8 p-8"
@@ -115,21 +134,25 @@ export function SessionDataForm({
             </p>
           )}
           <div className="flex flex-wrap gap-3">
-            {player_field_options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onTogglePlayerInfo(opt.value)}
-                className={`px-4 py-2 rounded-lg border font-medium text-sm transition-all ${
-                  input_info.includes(opt.value)
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-secondary/45 text-muted-foreground border-border hover:border-primary hover:text-foreground'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {independent_options.map(render_option)}
           </div>
+
+          {Object.entries(PLAYER_FIELD_DEPENDENTS).map(([parent_value, dependents]) => {
+            if (!input_info.includes(parent_value)) return null
+            const dependent_options = player_field_options.filter((opt) => dependents.includes(opt.value))
+            if (dependent_options.length === 0) return null
+
+            return (
+              <div
+                key={parent_value}
+                className="mt-3 flex flex-wrap items-center gap-3 border-l-2 border-primary/30 pl-4"
+              >
+                <span className="text-xs text-muted-foreground">Também perguntar:</span>
+                {dependent_options.map(render_option)}
+              </div>
+            )
+          })}
+
           {!player_fields_loading && !player_fields_error && player_field_options.length === 0 && (
             <p className="text-xs text-muted-foreground mt-2">
               Nenhum campo disponível para selecionar.

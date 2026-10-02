@@ -1,10 +1,14 @@
 import { PlusCircle, Settings } from 'lucide-react'
-import type { CreateConfigPayload } from '../types'
+import { humanizeLabel } from '../../../shared/utils/humanizeLabel'
+import { CONFIG_FIELD_LABELS_PT, GAME_LABELS_PT } from '../constants/configFieldLabels'
+import { format_config_value } from '../utils/configValue'
+import type { CreateConfigPayload, PlayerInfoOption } from '../types'
 
 interface SessionSummaryProps {
   session_name: string
   selected_game: string
   input_info: string[]
+  player_field_options: PlayerInfoOption[]
   active_config: CreateConfigPayload | null
   config_mode: 'select' | 'create'
   can_create_session: boolean
@@ -17,6 +21,7 @@ export function SessionSummary({
   session_name,
   selected_game,
   input_info,
+  player_field_options,
   active_config,
   config_mode,
   can_create_session,
@@ -24,6 +29,16 @@ export function SessionSummary({
   create_error,
   onCreateSession
 }: SessionSummaryProps) {
+  const game_label = selected_game ? GAME_LABELS_PT[selected_game] ?? humanizeLabel(selected_game) : ''
+
+  const player_field_labels = input_info.map(
+    (value) => player_field_options.find((opt) => opt.value === value)?.label ?? humanizeLabel(value)
+  )
+
+  const config_entries = active_config
+    ? Object.entries(active_config).filter(([key]) => !['game', 'configName'].includes(key))
+    : []
+
   return (
     <section
       className="surface-panel p-8"
@@ -36,37 +51,68 @@ export function SessionSummary({
         </h2>
       </div>
 
-      <div className="surface-subtle mb-6 space-y-3 p-5">
-        <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">
-          Resumo
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">Sessão</p>
-            <p className="text-foreground font-medium">
-              {session_name.trim() || '—'}
+      <div className="surface-subtle mb-6 space-y-5 p-5">
+        <div>
+          <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground mb-1">
+            Sessão
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-2xl font-semibold text-foreground">
+              {session_name.trim() || 'Sem nome ainda'}
             </p>
+            {game_label && (
+              <span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {game_label}
+              </span>
+            )}
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Jogo</p>
-            <p className="text-foreground font-medium capitalize">{selected_game}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Dados do Jogador</p>
-            <p className="text-foreground font-medium">
-              {input_info.length > 0 ? input_info.join(', ') : '—'}
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground mb-2">
+            Dados do Jogador
+          </p>
+          {player_field_labels.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {player_field_labels.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-border bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">—</p>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground mb-2">
+            Configuração da Partida
+          </p>
+          {active_config ? (
+            <div>
+              <p className="mb-2 text-sm font-semibold text-foreground">{active_config.configName}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {config_entries.map(([key, value]) => (
+                  <div key={key}>
+                    <p className="text-xs text-muted-foreground">
+                      {CONFIG_FIELD_LABELS_PT[key] ?? humanizeLabel(key)}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{format_config_value(value)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {config_mode === 'select'
+                ? 'Selecione uma configuração existente'
+                : 'Preencha o nome da configuração'}
             </p>
-          </div>
-          <div className="col-span-2 md:col-span-3">
-            <p className="text-xs text-muted-foreground">Configuração da Partida</p>
-            <p className="text-foreground font-medium">
-              {active_config
-                ? active_config.configName
-                : config_mode === 'select'
-                  ? 'Selecione uma configuração existente'
-                  : 'Preencha o nome da configuração'}
-            </p>
-          </div>
+          )}
         </div>
       </div>
 
