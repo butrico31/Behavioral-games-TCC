@@ -1,7 +1,22 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, IsEnum, ValidateNested, Min, Max } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsEnum,
+  IsArray,
+  IsIn,
+  ArrayMaxSize,
+  ValidateNested,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GameType } from '../../game/games.enum';
 import { Type } from 'class-transformer';
+import { RoundPopupDto } from './round-popup.dto';
+import { ROULETTE_TABLE_LAYOUTS, type RouletteTableLayout } from '../settings-game-roulette.entity';
 
 class RoulettePopupDto {
   @ApiProperty({
@@ -75,6 +90,27 @@ export class CreateSettingsDto {
   @Min(0) // 0 = sem limite; o serviço grava null
   @Max(480)
   sessionTimeLimit?: number | null;
+
+  @ApiPropertyOptional({
+    type: [RoundPopupDto],
+    example: [{ round: 3, message: 'Pensem no grupo nesta rodada.' }],
+    description: 'Popups exibidos ao jogador no início das rodadas indicadas (Roulette)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => RoundPopupDto)
+  roundPopups?: RoundPopupDto[] | null;
+
+  @ApiPropertyOptional({
+    enum: ROULETTE_TABLE_LAYOUTS,
+    example: 'mesa1',
+    description: 'Layout de mesa usado na partida (Roulette)',
+  })
+  @IsOptional()
+  @IsIn(ROULETTE_TABLE_LAYOUTS)
+  tableLayout?: RouletteTableLayout;
 
 
   @ApiPropertyOptional({

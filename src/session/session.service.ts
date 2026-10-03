@@ -140,6 +140,8 @@ export class SessionService {
           limitRounds: dto.settings.limitRounds,
           roundTimeLimit: dto.settings.roundTimeLimit,
           sessionTimeLimit: dto.settings.sessionTimeLimit,
+          roundPopups: dto.settings.roundPopups,
+          tableLayout: dto.settings.tableLayout,
           timeLimit: dto.settings.timeLimit,
           pointsLimit: dto.settings.pointsLimit,
           popup: dto.settings.popup,

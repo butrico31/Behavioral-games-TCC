@@ -2,13 +2,53 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Settings } from './settings.entity';
-import { SettingsGameRoulette } from './settings-game-roulette.entity';
+import {
+  SettingsGameRoulette,
+  RouletteRoundPopup,
+  ROULETTE_TABLE_LAYOUTS,
+  DEFAULT_TABLE_LAYOUT,
+} from './settings-game-roulette.entity';
 import { SettingsGamePrisoner } from './settings-game-prisoner.entity';
 import { CreateSettingsDto } from './dto/create-settings.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { GameService } from '../game/game.service';
 import { GameType } from '../game/games.enum';
 import { PLAYER_OPTIONAL_FIELDS } from '../common/constants/player-fields.constants';
+import { DEFAULT_GOAL, DEFAULT_INIT_MONEY } from '../roulette/roulette.rules';
+
+/** A partida acaba quando o saldo chega na meta: meta ≤ fichas iniciais acabaria no 1º giro. */
+function assertGoalAboveStart(initMoney: number, pointsLimit: number) {
+  if (pointsLimit <= initMoney) {
+    throw new BadRequestException(
+      `A meta (${pointsLimit}) precisa ser maior que as fichas iniciais (${initMoney}).`,
+    );
+  }
+}
+
+/**
+ * Limpa os popups vindos do formulário: mensagem vazia é descartada (linha que o professor
+ * adicionou e não preencheu) e rodada repetida é erro, em vez de uma das mensagens sumir.
+ * A roleta não tem número fixo de rodadas, então não há teto além do limite do DTO.
+ */
+function normalizeRoundPopups(
+  popups: RouletteRoundPopup[] | null | undefined,
+): RouletteRoundPopup[] | null {
+  if (!popups) return null;
+
+  const cleaned = popups
+    .map((popup) => ({ round: popup.round, message: popup.message.trim() }))
+    .filter((popup) => popup.message !== '');
+
+  const seen = new Set<number>();
+  for (const popup of cleaned) {
+    if (seen.has(popup.round)) {
+      throw new BadRequestException(`Mais de um popup na rodada ${popup.round}.`);
+    }
+    seen.add(popup.round);
+  }
+
+  return cleaned.length > 0 ? cleaned.sort((a, b) => a.round - b.round) : null;
+}
 
 @Injectable()
 export class SettingsService {
@@ -42,8 +82,9 @@ export class SettingsService {
     const roulette = [
       { name: 'timeLimit', type: 'number' },
       { name: 'pointsLimit', type: 'number' },
-      { name: 'popup', type: 'json|null' },
       { name: 'initMoney', type: 'number' },
+      { name: 'tableLayout', type: `enum(${ROULETTE_TABLE_LAYOUTS.join(',')})` },
+      { name: 'roundPopups', type: 'roundPopups' },
     ];
 
     if (game === 'prisoner') {
@@ -73,13 +114,20 @@ export class SettingsService {
     let settings: Settings;
 
     if (gameType === 'roulette') {
+      // Campo vazio no formulário chega como 0: fichas e meta caem no default da mesa,
+      // tempo vira "sem limite".
+      const initMoney = dto.initMoney && dto.initMoney > 0 ? dto.initMoney : DEFAULT_INIT_MONEY;
+      const pointsLimit = dto.pointsLimit && dto.pointsLimit > 0 ? dto.pointsLimit : DEFAULT_GOAL;
+      assertGoalAboveStart(initMoney, pointsLimit);
       const rouletteSettings = this.settingsRouletteRepository.create({
         configName: dto.configName,
         game: dto.game,
-        timeLimit: dto.timeLimit,
-        pointsLimit: dto.pointsLimit,
+        timeLimit: dto.timeLimit && dto.timeLimit > 0 ? dto.timeLimit : null,
+        pointsLimit,
         popup: dto.popup,
-        initMoney: dto.initMoney,
+        initMoney,
+        roundPopups: normalizeRoundPopups(dto.roundPopups),
+        tableLayout: dto.tableLayout ?? DEFAULT_TABLE_LAYOUT,
       });
       settings = await this.settingsRouletteRepository.save(rouletteSettings);
     } else if (gameType === 'prisoner') {
@@ -138,10 +186,21 @@ export class SettingsService {
     if (dto.configName) settings.configName = dto.configName;
 
     if (settings instanceof SettingsGameRoulette) {
-      if (dto.timeLimit !== undefined) settings.timeLimit = dto.timeLimit;
-      if (dto.pointsLimit !== undefined) settings.pointsLimit = dto.pointsLimit;
+      if (dto.timeLimit !== undefined) {
+        settings.timeLimit = dto.timeLimit && dto.timeLimit > 0 ? dto.timeLimit : null;
+      }
+      if (dto.pointsLimit !== undefined) {
+        settings.pointsLimit = dto.pointsLimit > 0 ? dto.pointsLimit : DEFAULT_GOAL;
+      }
       if (dto.popup !== undefined) settings.popup = dto.popup;
-      if (dto.initMoney !== undefined) settings.initMoney = dto.initMoney;
+      if (dto.initMoney !== undefined) {
+        settings.initMoney = dto.initMoney > 0 ? dto.initMoney : DEFAULT_INIT_MONEY;
+      }
+      assertGoalAboveStart(settings.initMoney, settings.pointsLimit);
+      if (dto.roundPopups !== undefined) {
+        settings.roundPopups = normalizeRoundPopups(dto.roundPopups);
+      }
+      if (dto.tableLayout !== undefined) settings.tableLayout = dto.tableLayout;
       return await this.settingsRouletteRepository.save(settings);
     } else if (settings instanceof SettingsGamePrisoner) {
       if (dto.userViewPoints !== undefined) settings.userViewPoints = dto.userViewPoints;

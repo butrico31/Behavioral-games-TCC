@@ -2,20 +2,43 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Match, MatchStatus, RouletteMoveOption } from '../match/match.entity';
-import { SettingsGameRoulette } from '../settings/settings-game-roulette.entity';
-import { RouletteMatchState, RouletteSpinResult } from './interfaces/roulette-match.interface';
+import {
+  SettingsGameRoulette,
+  DEFAULT_TABLE_LAYOUT,
+} from '../settings/settings-game-roulette.entity';
+import {
+  RouletteEndedReason,
+  RouletteMatchState,
+  RouletteMatchView,
+  RouletteSpinResult,
+} from './interfaces/roulette-match.interface';
+import {
+  DEFAULT_GOAL,
+  DEFAULT_INIT_MONEY,
+  ROULETTE_CHIP_VALUES,
+  ROULETTE_CONDITIONS,
+  ROULETTE_WHEEL,
+  chanceOf,
+  deltaFor,
+  drawPocket,
+} from './roulette.rules';
+
+/** Campo vazio no formulário chega como 0 (ou null em configs antigas): cai no default. */
+const positiveOr = <T>(value: number | null | undefined, fallback: T): number | T =>
+  typeof value === 'number' && value > 0 ? value : fallback;
 
 @Injectable()
 export class RouletteService {
-  // Chance base de acerto e coeficiente de aceleração quadrática aplicados a cada rodada
-  // perdida seguida, até se tornar quase impossível perder (efeito de "pity" / near-miss).
-  // A curva sobe pouco nas primeiras derrotas e dispara nas últimas — ver tabela no plano.
-  private static readonly BASE_WIN_PROBABILITY = 0.1;
-  private static readonly WIN_PROBABILITY_ACCELERATION = 0.02;
-  private static readonly MAX_WIN_PROBABILITY = 0.97;
-  private static readonly PAYOUT_MULTIPLIER = 2;
-
+  /**
+   * Partidas em memória. Uma partida encerrada continua aqui (status 'finished') para o
+   * jogador ainda conseguir consultar o resumo depois do último giro.
+   */
   private readonly activeMatches = new Map<string, RouletteMatchState>();
+  /**
+   * Popups do professor por partida (rodada -> mensagem). Ficam fora do estado porque o estado
+   * vai inteiro para o jogador: aqui ele só recebe a mensagem da rodada que está começando.
+   */
+  private readonly roundPopups = new Map<string, Record<number, string>>();
 
   constructor(
     @InjectRepository(Match)
@@ -24,7 +47,12 @@ export class RouletteService {
 
   async initMatch(matchId: string, playerId: string): Promise<RouletteMatchState> {
     const existing = this.activeMatches.get(matchId);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.playerId !== playerId) {
+        throw new BadRequestException(`Player ${playerId} is not part of match ${matchId}`);
+      }
+      return existing;
+    }
 
     const match = await this.matchRepository.findOne({
       where: { id: matchId },
@@ -44,36 +72,66 @@ export class RouletteService {
     }
 
     const settings = match.session.settings as SettingsGameRoulette;
-    const initMoney = settings?.initMoney ?? 1000;
+    const initMoney = positiveOr(settings?.initMoney, DEFAULT_INIT_MONEY);
+    const timeLimit = positiveOr(settings?.timeLimit, null);
+    const moves = (match.moves as RouletteMatchState['moves']) ?? {};
 
+    // Se já houver jogadas gravadas, o saldo e a sequência continuam de onde pararam.
+    const ordered = Object.entries(moves)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, move]) => move);
+    const last = ordered[ordered.length - 1];
+    let pityStreak = 0;
+    for (const move of ordered) pityStreak = move.winrate ? 0 : pityStreak + 1;
+
+    const startedAt = Date.now();
     const state: RouletteMatchState = {
       matchId,
       sessionId: match.session_id,
       playerId,
-      coins: initMoney,
+      coins: last ? last.coinsAmount : initMoney,
       initMoney,
-      pointsLimit: settings?.pointsLimit ?? 500,
-      timeLimit: settings?.timeLimit ?? null,
-      pityStreak: 0,
-      moves: (match.moves as RouletteMatchState['moves']) ?? {},
+      pointsLimit: positiveOr(settings?.pointsLimit, DEFAULT_GOAL),
+      timeLimit,
+      startedAt,
+      endsAt: timeLimit !== null ? startedAt + timeLimit * 1000 : null,
+      pityStreak,
+      moves,
       status: 'in_progress',
+      endedReason: null,
+      tableLayout: settings?.tableLayout ?? DEFAULT_TABLE_LAYOUT,
     };
 
     this.activeMatches.set(matchId, state);
+    this.roundPopups.set(
+      matchId,
+      Object.fromEntries((settings?.roundPopups ?? []).map((popup) => [popup.round, popup.message])),
+    );
     return state;
   }
 
-  private winProbabilityFor(pityStreak: number): number {
-    return Math.min(
-      RouletteService.BASE_WIN_PROBABILITY +
-        RouletteService.WIN_PROBABILITY_ACCELERATION * pityStreak ** 2,
-      RouletteService.MAX_WIN_PROBABILITY,
-    );
+  /** Rodadas já jogadas. A próxima é esta + 1. */
+  private playedRounds(state: RouletteMatchState): number {
+    return Object.keys(state.moves).length;
   }
 
-  private otherColor(opcao: RouletteMoveOption): RouletteMoveOption {
-    const rest = Object.values(RouletteMoveOption).filter((color) => color !== opcao);
-    return rest[Math.floor(Math.random() * rest.length)];
+  private popupFor(matchId: string, round: number): string | null {
+    return this.roundPopups.get(matchId)?.[round] ?? null;
+  }
+
+  toView(state: RouletteMatchState): RouletteMatchView {
+    const inProgress = state.status === 'in_progress';
+    const round = this.playedRounds(state);
+    return {
+      ...state,
+      round,
+      maxMagnitude: Math.max(0, state.coins),
+      wheel: ROULETTE_WHEEL,
+      conditions: ROULETTE_CONDITIONS,
+      chipValues: ROULETTE_CHIP_VALUES,
+      serverNow: Date.now(),
+      popup: inProgress ? this.popupFor(state.matchId, round + 1) : null,
+    };
   }
 
   async spin(
@@ -88,64 +146,87 @@ export class RouletteService {
       throw new BadRequestException(`Player ${playerId} is not part of match ${matchId}`);
     }
     if (state.status !== 'in_progress') {
-      throw new BadRequestException('Match is not in progress');
+      throw new BadRequestException('A partida já foi encerrada.');
+    }
+    if (state.endsAt !== null && Date.now() >= state.endsAt) {
+      await this.finish(state, 'tempo');
+      throw new BadRequestException('O tempo da partida terminou.');
     }
     if (aposta > state.coins) {
-      throw new BadRequestException('Bet exceeds current coin balance');
+      throw new BadRequestException('A aposta passa do saldo de fichas.');
     }
 
-    const winProbability = this.winProbabilityFor(state.pityStreak);
-    const won = Math.random() < winProbability;
-    const resultColor = won ? opcao : this.otherColor(opcao);
-
-    state.coins = state.coins - aposta + (won ? aposta * RouletteService.PAYOUT_MULTIPLIER : 0);
+    const pocket = drawPocket();
+    const won = pocket.condition === opcao;
+    const delta = deltaFor(opcao, aposta, won);
+    const winProbability = chanceOf(opcao);
     const pityStreakAtSpin = state.pityStreak;
+
+    state.coins += delta;
     state.pityStreak = won ? 0 : state.pityStreak + 1;
 
-    const round = Object.keys(state.moves).length + 1;
+    const round = this.playedRounds(state) + 1;
     state.moves[String(round)] = {
       coinsAmount: state.coins,
       aposta,
-      opcao: resultColor,
+      opcao,
       winrate: won,
       winProbability,
       pityStreak: pityStreakAtSpin,
+      pocket: pocket.label,
+      resultado: pocket.condition,
+      delta,
     };
 
-    const matchFinished = state.coins <= 0 || state.coins >= state.initMoney + state.pointsLimit;
-    if (matchFinished) {
-      state.status = 'finished';
-      await this.persistMatch(state);
+    const endedReason: RouletteEndedReason | null =
+      state.coins <= 0 ? 'saldo' : state.coins >= state.pointsLimit ? 'meta' : null;
+    if (endedReason) {
+      await this.finish(state, endedReason);
     }
 
     return {
       round,
-      opcao: resultColor,
+      opcao,
+      pocket: pocket.label,
+      resultado: pocket.condition,
       aposta,
       won,
+      delta,
       coinsAmount: state.coins,
       winProbability,
-      matchFinished,
+      pityStreak: state.pityStreak,
+      maxMagnitude: Math.max(0, state.coins),
+      matchFinished: endedReason !== null,
+      endedReason,
+      nextPopup: endedReason ? null : this.popupFor(matchId, round + 1),
     };
   }
 
-  private async persistMatch(state: RouletteMatchState): Promise<Match> {
-    const match = await this.matchRepository.findOne({
-      where: { id: state.matchId },
-    });
+  private async finish(state: RouletteMatchState, reason: RouletteEndedReason): Promise<void> {
+    if (state.status === 'finished') return;
+    state.status = 'finished';
+    state.endedReason = reason;
+
+    const match = await this.matchRepository.findOne({ where: { id: state.matchId } });
     if (!match) throw new NotFoundException(`Match ${state.matchId} not found`);
 
     match.moves = state.moves;
     match.status = MatchStatus.FINALIZADA;
-    const saved = await this.matchRepository.save(match);
-
-    this.activeMatches.delete(state.matchId);
-    return saved;
+    await this.matchRepository.save(match);
+    this.roundPopups.delete(state.matchId);
   }
 
-  async finalizeMatch(matchId: string): Promise<Match> {
+  /**
+   * Encerramento pedido pelo front: pelo botão do jogador ou quando o relógio dele zera. O
+   * motivo é decidido aqui — se o prazo já passou, é 'tempo', senão foi o jogador. Idempotente.
+   */
+  async finalizeMatch(matchId: string): Promise<RouletteMatchView> {
     const state = this.getState(matchId);
-    return await this.persistMatch(state);
+    if (state.status === 'in_progress') {
+      const timeUp = state.endsAt !== null && Date.now() >= state.endsAt - 1000;
+      await this.finish(state, timeUp ? 'tempo' : 'jogador');
+    }
+    return this.toView(state);
   }
 
   getState(matchId: string): RouletteMatchState {

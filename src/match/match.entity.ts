@@ -23,12 +23,22 @@ export enum RouletteMoveOption {
 }
 
 export interface RouletteRoundMove {
+  /** Saldo depois da rodada. */
   coinsAmount: number;
   aposta: number;
+  /** Condição em que o jogador apostou. */
   opcao: RouletteMoveOption;
+  /** true quando a casa sorteada é da condição apostada. */
   winrate: boolean;
+  /** Chance da condição apostada (casas da cor / 38). */
   winProbability?: number;
+  /** Rodadas seguidas sem reforço antes desta. */
   pityStreak?: number;
+  /** Casa sorteada ("0", "00", "1"…"36") e a cor dela. */
+  pocket?: string;
+  resultado?: RouletteMoveOption;
+  /** Variação do saldo nesta rodada. */
+  delta?: number;
 }
 
 export interface PrisonerRoundMove {

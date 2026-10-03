@@ -2,8 +2,7 @@ import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RouletteService } from './roulette.service';
 import { SpinRouletteDto } from './dto/spin-roulette.dto';
-import type { RouletteMatchState, RouletteSpinResult } from './interfaces/roulette-match.interface';
-import { Match } from '../match/match.entity';
+import type { RouletteMatchView, RouletteSpinResult } from './interfaces/roulette-match.interface';
 
 @ApiTags('Roulette')
 @ApiBearerAuth()
@@ -20,8 +19,9 @@ export class RouletteController {
   async join(
     @Param('matchId') matchId: string,
     @Query('playerId') playerId: string,
-  ): Promise<RouletteMatchState> {
-    return await this.rouletteService.initMatch(matchId, playerId);
+  ): Promise<RouletteMatchView> {
+    const state = await this.rouletteService.initMatch(matchId, playerId);
+    return this.rouletteService.toView(state);
   }
 
   @Post(':matchId/spin')
@@ -42,17 +42,18 @@ export class RouletteController {
   @Get(':matchId/state')
   @ApiOperation({ summary: 'Get current roulette match state' })
   @ApiParam({ name: 'matchId', description: 'Match ID' })
-  getState(@Param('matchId') matchId: string): RouletteMatchState {
-    return this.rouletteService.getState(matchId);
+  getState(@Param('matchId') matchId: string): RouletteMatchView {
+    return this.rouletteService.toView(this.rouletteService.getState(matchId));
   }
 
   @Post(':matchId/finish')
   @ApiOperation({
     summary: 'Finalize a roulette match',
-    description: 'Persists the accumulated moves to the match and marks it as finalizada.',
+    description:
+      'Persists the moves and marks the match as finalizada. The reason (tempo/jogador) is decided by the server.',
   })
   @ApiParam({ name: 'matchId', description: 'Match ID' })
-  async finish(@Param('matchId') matchId: string): Promise<Match> {
+  async finish(@Param('matchId') matchId: string): Promise<RouletteMatchView> {
     return await this.rouletteService.finalizeMatch(matchId);
   }
 }
