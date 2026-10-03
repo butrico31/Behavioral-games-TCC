@@ -52,17 +52,17 @@ export function SessionDataForm({
 
   return (
     <section
-      className="surface-panel mb-8 p-8"
+      className="surface-panel p-6"
       aria-labelledby="section-session-data"
     >
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <Users className="w-6 h-6 text-primary" />
-        <h2 id="section-session-data" className="text-3xl text-foreground">
+        <h2 id="section-session-data" className="text-2xl text-foreground md:text-3xl">
           Dados da Sessão
         </h2>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2">
         {/* Session Name */}
         <div>
           <label htmlFor="session-name" className="block text-sm font-medium text-foreground mb-2">
@@ -114,12 +114,10 @@ export function SessionDataForm({
             </p>
           )}
         </div>
+      </div>
 
-        {/* Player Info (session-level) */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Dados do Jogador *
-          </label>
+        <div className="mt-5 border-t border-border/70 pt-5">
+          <p className="block text-sm font-medium text-foreground mb-1">Dados do Jogador *</p>
           <p className="text-xs text-muted-foreground mb-3">
             Selecione quais informações serão solicitadas ao jogador ao entrar na sessão
           </p>
@@ -164,7 +162,6 @@ export function SessionDataForm({
             </p>
           )}
         </div>
-      </div>
     </section>
   )
 }

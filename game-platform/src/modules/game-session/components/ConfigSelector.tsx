@@ -16,8 +16,8 @@ interface ConfigSelectorProps {
   configs_loading: boolean
   configs_error: boolean
   new_config: CreateConfigPayload
-  common_fields: GameConfigFieldDefinition[]
-  game_fields: GameConfigFieldDefinition[]
+  /** Campos do modo "Criar Nova" nesta etapa: nome + parâmetros do jogo. */
+  form_fields: GameConfigFieldDefinition[]
   fields_loading: boolean
   fields_error: boolean
   is_deleting_config: boolean
@@ -37,8 +37,7 @@ export function ConfigSelector({
   configs_loading,
   configs_error,
   new_config,
-  common_fields,
-  game_fields,
+  form_fields,
   fields_loading,
   fields_error,
   is_deleting_config,
@@ -61,22 +60,22 @@ export function ConfigSelector({
 
   return (
     <section
-      className="surface-panel relative mb-8 overflow-visible p-8"
+      className="surface-panel relative overflow-visible p-6"
       aria-labelledby="section-match-config"
     >
       <div className="flex items-center gap-3 mb-2">
         <Gamepad2 className="w-6 h-6 text-primary" />
-        <h2 id="section-match-config" className="text-3xl text-foreground">
+        <h2 id="section-match-config" className="text-2xl text-foreground md:text-3xl">
           Configuração da Partida
         </h2>
       </div>
-      <p className="text-muted-foreground text-sm mb-6">
+      <p className="text-muted-foreground text-sm mb-4">
         Parâmetros do jogo{' '}
         <span className="text-primary font-semibold">{game_label}</span>
       </p>
 
       {/* Mode Toggle */}
-      <div className="flex gap-3 mb-8">
+      <div className="flex gap-3 mb-5">
         <button
           type="button"
           onClick={() => onConfigModeChange('select')}
@@ -233,12 +232,7 @@ export function ConfigSelector({
               Não foi possível carregar os campos da configuração para este jogo.
             </p>
           )}
-          <ConfigurationForm
-            config={new_config}
-            common_fields={common_fields}
-            game_fields={game_fields}
-            onChange={onNewConfigChange}
-          />
+          <ConfigurationForm config={new_config} fields={form_fields} onChange={onNewConfigChange} />
         </div>
       )}
     </section>

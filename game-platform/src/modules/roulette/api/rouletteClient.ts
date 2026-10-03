@@ -1,10 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import type {
-  RouletteFinishResponse,
-  RouletteJoinResponse,
-  RouletteSpinRequest,
-  RouletteSpinResponse,
-} from '../types/roulette'
+import type { RouletteMatchView, RouletteSpinRequest, RouletteSpinResponse } from '../types/roulette'
 
 const roulette_api_url = import.meta.env.VITE_ROULETTE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -65,9 +60,9 @@ export class RouletteApiError extends Error {
   }
 }
 
-export async function joinRouletteMatch(matchId: string, playerId: string): Promise<RouletteJoinResponse> {
+export async function joinRouletteMatch(matchId: string, playerId: string): Promise<RouletteMatchView> {
   try {
-    const response = await roulette_client.post<RouletteJoinResponse>(`/roulette/matches/${matchId}/join`, undefined, {
+    const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/join`, undefined, {
       params: { playerId },
     })
     return response.data
@@ -85,18 +80,18 @@ export async function spinRouletteMatch(matchId: string, payload: RouletteSpinRe
   }
 }
 
-export async function getRouletteMatchState(matchId: string): Promise<RouletteJoinResponse> {
+export async function getRouletteMatchState(matchId: string): Promise<RouletteMatchView> {
   try {
-    const response = await roulette_client.get<RouletteJoinResponse>(`/roulette/matches/${matchId}/state`)
+    const response = await roulette_client.get<RouletteMatchView>(`/roulette/matches/${matchId}/state`)
     return response.data
   } catch (error) {
     throw new RouletteApiError(resolveErrorMessage(error))
   }
 }
 
-export async function finishRouletteMatch(matchId: string): Promise<RouletteFinishResponse> {
+export async function finishRouletteMatch(matchId: string): Promise<RouletteMatchView> {
   try {
-    const response = await roulette_client.post<RouletteFinishResponse>(`/roulette/matches/${matchId}/finish`)
+    const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/finish`)
     return response.data
   } catch (error) {
     throw new RouletteApiError(resolveErrorMessage(error))

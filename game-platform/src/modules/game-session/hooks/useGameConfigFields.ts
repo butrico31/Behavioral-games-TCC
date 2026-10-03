@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { sessionService } from '../services/sessionService'
 import type { GameConfigFieldDefinition } from '../types'
 
-const SAFE_FIELD_TYPES = new Set(['string', 'number', 'boolean'])
+// roundPopups: lista de { round, message } com editor próprio (RoundPopupsEditor).
+const SAFE_FIELD_TYPES = new Set(['string', 'number', 'boolean', 'roundPopups'])
 
 const normalize_type = (field_name: string, field_type: string): string => {
   // Product rule: keep difficulty as a controlled choice list.

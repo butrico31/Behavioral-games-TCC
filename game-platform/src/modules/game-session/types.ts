@@ -32,6 +32,15 @@ export interface GameConfigFieldsResponse {
 
 export type ConfigPrimitiveValue = string | number | boolean
 
+/** Mensagem do professor que aparece em popup para o jogador no início de uma rodada (roleta). */
+export interface RoundPopup {
+  round: number
+  message: string
+}
+
+/** Valor de um campo de configuração: primitivo, ou a lista de popups por rodada. */
+export type ConfigFieldValue = ConfigPrimitiveValue | RoundPopup[] | null
+
 // -- Session Settings (game config stored in DB) --
 
 export interface SessionSettings {
@@ -39,7 +48,7 @@ export interface SessionSettings {
   configName: string
   game: string
   createdAt: string
-  [key: string]: ConfigPrimitiveValue | string
+  [key: string]: ConfigFieldValue
 }
 
 export interface SessionUser {
@@ -71,13 +80,13 @@ export interface GameConfig {
   configName: string
   game: string
   createdAt?: string
-  [key: string]: ConfigPrimitiveValue | string | undefined
+  [key: string]: ConfigFieldValue | undefined
 }
 
 export interface CreateConfigPayload {
   configName: string
   game: string
-  [key: string]: ConfigPrimitiveValue | string
+  [key: string]: ConfigFieldValue
 }
 
 // -- Session Creation Types --

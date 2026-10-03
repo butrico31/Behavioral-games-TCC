@@ -7,6 +7,12 @@ import { SessionCodeModal } from '../components/SessionCodeModal'
 import { SessionDataForm } from '../components/SessionDataForm'
 import { ConfigSelector } from '../components/ConfigSelector'
 import { SessionSummary } from '../components/SessionSummary'
+import { ConfigFieldsStep } from '../components/ConfigFieldsStep'
+import {
+  CONFIG_FIELD_STEPS,
+  group_fields_by_step,
+  type ConfigFieldStepId
+} from '../constants/configSteps'
 import { useGsapReveal } from '../../../shared/hooks/useGsapReveal'
 import { useToast } from '../../../shared/hooks/useToast'
 import { useSessionCreation } from '../hooks/useSessionCreation'
@@ -17,14 +23,22 @@ import { useGameConfigFields } from '../hooks/useGameConfigFields'
 import { useCreateSession } from '../hooks/useCreateSession'
 import { useAuth } from '../../auth/hooks/useAuth'
 import { PLAYER_FIELD_DEPENDENTS } from '../constants/playerFieldDependencies'
+import {
+  filled_round_popups,
+  is_round_popup_list,
+  round_popups_issue
+} from '../utils/roundPopups'
 import type {
+  ConfigFieldValue,
   CreateConfigPayload,
   CreateSessionPayload,
   CreateSessionResponse,
   GameConfigFieldDefinition
 } from '../types'
 
-const parse_enum_default = (field_type: string): string => {
+type WizardStep = 'session' | 'config' | ConfigFieldStepId | 'summary'
+
+const parse_enum_default =(field_type: string): string => {
   const match = /^enum\((.+)\)$/.exec(field_type)
   if (!match) return ''
   return match[1]
@@ -33,7 +47,8 @@ const parse_enum_default = (field_type: string): string => {
     .filter(Boolean)[0] ?? ''
 }
 
-const default_value_for_type = (field_type: string): string | number | boolean => {
+const default_value_for_type = (field_type: string): ConfigFieldValue => {
+  if (field_type === 'roundPopups') return []
   if (field_type === 'boolean') return false
   if (field_type === 'number') return 0
   if (/^enum\(.+\)$/.test(field_type)) return parse_enum_default(field_type)
@@ -76,7 +91,7 @@ const extract_invite_code = (response: CreateSessionResponse): string | null => 
 export function CreateSessionPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [current_step, setCurrentStep] = useState<1 | 2 | 3>(1)
+  const [step_index, setStepIndex] = useState(0)
   const [create_error, setCreateError] = useState<string | null>(null)
   const page_ref = useRef<HTMLDivElement | null>(null)
   const { toast, showToast } = useToast()
@@ -164,10 +179,13 @@ export function CreateSessionPage() {
     dispatch
   ])
 
-  useGsapReveal(
-    '[data-create-section="title"], [data-create-section="form"], [data-create-section="config"], [data-create-section="summary"]',
-    { root: page_ref, y: 18, duration: 0.55, stagger: 0.09, deps: [current_step] }
-  )
+  useGsapReveal('[data-create-section="title"], [data-create-section="step"]', {
+    root: page_ref,
+    y: 18,
+    duration: 0.55,
+    stagger: 0.09,
+    deps: [step_index]
+  })
 
   useEffect(() => {
     dispatch({ type: 'SYNC_CONFIG_MODE_FOR_EMPTY_LIST', payload: configs.length === 0 })
@@ -216,10 +234,56 @@ export function CreateSessionPage() {
         ? state.new_config
         : null
 
-  const can_create_session = can_create_session_base && active_config !== null
+  const round_popups_error =
+    active_config && is_round_popup_list(active_config.roundPopups)
+      ? round_popups_issue(active_config.roundPopups)
+      : null
+
+  const can_create_session =
+    can_create_session_base && active_config !== null && round_popups_error === null
   const is_creating = is_creating_config || is_creating_session
-  const step1_valid = can_create_session_base
-  const step2_valid = active_config !== null
+
+  // Poucas etapas, cada uma cabendo sem rolar: os parâmetros do jogo vão junto com o nome da
+  // configuração; só os popups (lista que cresce) têm etapa própria, e só no "Criar Nova" de um
+  // jogo que tenha esse campo (o Prisioneiro não tem).
+  const field_groups = useMemo(() => group_fields_by_step(game_fields), [game_fields])
+  const config_form_fields = useMemo(
+    () => [...common_fields, ...field_groups.game],
+    [common_fields, field_groups]
+  )
+  const field_steps = useMemo(
+    () =>
+      state.config_mode === 'create'
+        ? CONFIG_FIELD_STEPS.filter((meta) => field_groups[meta.id].length > 0)
+        : [],
+    [state.config_mode, field_groups]
+  )
+  const steps = useMemo<WizardStep[]>(
+    () => ['session', 'config', ...field_steps.map((meta) => meta.id), 'summary'],
+    [field_steps]
+  )
+  const current_index = Math.min(step_index, steps.length - 1)
+  const current_step = steps[current_index]
+  const current_field_step = field_steps.find((meta) => meta.id === current_step) ?? null
+
+  const step_blocker: Record<WizardStep, string | null> = {
+    session:
+      state.session_name.trim() === '' || !state.selected_game || state.input_info.length === 0
+        ? 'Preencha o nome da sessão, escolha o jogo e selecione ao menos um dado do jogador.'
+        : null,
+    config:
+      active_config === null
+        ? state.config_mode === 'create'
+          ? 'Dê um nome à configuração para continuar.'
+          : 'Selecione uma configuração de partida para continuar.'
+        : null,
+    popups: round_popups_error,
+    summary: null
+  }
+  const current_blocker = step_blocker[current_step]
+
+  const goNext = () => setStepIndex(Math.min(current_index + 1, steps.length - 1))
+  const goBack = () => setStepIndex(Math.max(current_index - 1, 0))
 
   const session_settings = useMemo(() => {
     if (!active_config) return null
@@ -244,7 +308,10 @@ export function CreateSessionPage() {
       let settings_for_session = session_settings
 
       if (state.config_mode === 'create') {
-        const created_config = await createConfig(state.new_config)
+        const new_config = is_round_popup_list(state.new_config.roundPopups)
+          ? { ...state.new_config, roundPopups: filled_round_popups(state.new_config.roundPopups) }
+          : state.new_config
+        const created_config = await createConfig(new_config)
         const { id: _id, createdAt: _createdAt, game: _game, ...persisted_settings } = created_config
         const sanitized_persisted_settings = sanitize_settings(
           persisted_settings,
@@ -322,22 +389,50 @@ export function CreateSessionPage() {
     <div ref={page_ref} className="app-shell">
       <Header />
 
-      <main className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
-        {current_step === 1 && (
-          <div data-create-section="title" className="surface-panel mb-8 px-6 py-7 md:px-10 md:py-8">
-            <div className="mb-3 flex items-center gap-3">
-              <PlusCircle className="h-9 w-9 text-primary" />
-              <h1 className="text-4xl text-foreground md:text-5xl">Criar Nova Sessão</h1>
+      <main className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-8">
+        <div
+          data-create-section="step"
+          className={`relative ${current_step === 'config' ? 'z-20' : 'z-10'}`}
+        >
+          {/* Título, voltar e progresso numa linha só: sobra altura para a etapa caber sem rolar. */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex items-center gap-3">
+              {current_index > 0 ? (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Voltar
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <PlusCircle className="h-4 w-4 text-primary" />
+                  Criar Nova Sessão
+                </span>
+              )}
+              <span className="heading-kicker">
+                Etapa {current_index + 1} de {steps.length}
+              </span>
             </div>
-            <p className="max-w-3xl text-sm text-muted-foreground md:text-base">
-              Defina os dados da sessão, configure a partida e comece
-            </p>
+            <div className="flex items-center gap-1.5" aria-hidden="true">
+              {steps.map((step, index) => (
+                <span
+                  key={step}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === current_index
+                      ? 'w-6 bg-primary'
+                      : index < current_index
+                        ? 'w-3 bg-primary/60'
+                        : 'w-3 bg-border'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
-        )}
 
-        {current_step === 1 && (
-          <div data-create-section="form">
-            <p className="heading-kicker mb-2">Etapa 1 de 3</p>
+          {current_step === 'session' && (
             <SessionDataForm
               session_name={state.session_name}
               selected_game={state.selected_game}
@@ -352,36 +447,9 @@ export function CreateSessionPage() {
               onGameChange={(value) => dispatch({ type: 'SET_GAME', payload: value })}
               onTogglePlayerInfo={handleTogglePlayerInfo}
             />
-            <div className="mt-6 flex flex-col items-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                disabled={!step1_valid}
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Continuar
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              {!step1_valid && (
-                <p className="text-xs text-muted-foreground">
-                  Preencha o nome da sessão e selecione ao menos um dado do jogador para continuar.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+          )}
 
-        {current_step === 2 && (
-          <div data-create-section="config" className="relative z-20">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </button>
-            <p className="heading-kicker mb-2">Etapa 2 de 3</p>
+          {current_step === 'config' && (
             <ConfigSelector
               selected_game={state.selected_game}
               config_mode={state.config_mode}
@@ -391,8 +459,7 @@ export function CreateSessionPage() {
               configs_loading={configs_loading}
               configs_error={configs_error}
               new_config={state.new_config}
-              common_fields={common_fields}
-              game_fields={game_fields}
+              form_fields={config_form_fields}
               fields_loading={fields_loading}
               fields_error={fields_error}
               is_deleting_config={is_deleting_config}
@@ -402,36 +469,18 @@ export function CreateSessionPage() {
               onSelectConfig={(id) => dispatch({ type: 'SELECT_CONFIG', payload: id })}
               onNewConfigChange={(config) => dispatch({ type: 'UPDATE_NEW_CONFIG', payload: config })}
             />
-            <div className="mt-6 flex flex-col items-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                disabled={!step2_valid}
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Continuar
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              {!step2_valid && (
-                <p className="text-xs text-muted-foreground">
-                  Selecione ou crie uma configuração de partida para continuar.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+          )}
 
-        {current_step === 3 && (
-          <div data-create-section="summary" className="relative z-10">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </button>
-            <p className="heading-kicker mb-2">Etapa 3 de 3</p>
+          {current_field_step && (
+            <ConfigFieldsStep
+              meta={current_field_step}
+              config={state.new_config}
+              fields={field_groups[current_field_step.id]}
+              onChange={(config) => dispatch({ type: 'UPDATE_NEW_CONFIG', payload: config })}
+            />
+          )}
+
+          {current_step === 'summary' && (
             <SessionSummary
               session_name={state.session_name}
               selected_game={state.selected_game}
@@ -444,8 +493,25 @@ export function CreateSessionPage() {
               create_error={create_error}
               onCreateSession={handleCreateSession}
             />
-          </div>
-        )}
+          )}
+
+          {current_step !== 'summary' && (
+            <div className="mt-4 flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={current_blocker !== null}
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Continuar
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {current_blocker && (
+                <p className="text-xs text-muted-foreground">{current_blocker}</p>
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Session Code Modal */}

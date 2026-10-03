@@ -41,12 +41,12 @@ export function SessionSummary({
 
   return (
     <section
-      className="surface-panel p-8"
+      className="surface-panel p-6"
       aria-labelledby="section-create"
     >
       <div className="flex items-center gap-3 mb-6">
         <PlusCircle className="w-6 h-6 text-primary" />
-        <h2 id="section-create" className="text-3xl text-foreground">
+        <h2 id="section-create" className="text-2xl text-foreground md:text-3xl">
           Criar Sessão
         </h2>
       </div>
@@ -95,7 +95,7 @@ export function SessionSummary({
           {active_config ? (
             <div>
               <p className="mb-2 text-sm font-semibold text-foreground">{active_config.configName}</p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {config_entries.map(([key, value]) => (
                   <div key={key}>
                     <p className="text-xs text-muted-foreground">

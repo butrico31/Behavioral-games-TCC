@@ -1,7 +1,13 @@
 import { ChevronDown } from 'lucide-react'
 import { humanizeLabel } from '../../../shared/utils/humanizeLabel'
-import { CONFIG_FIELD_HINTS_PT, CONFIG_FIELD_LABELS_PT } from '../constants/configFieldLabels'
-import type { CreateConfigPayload, GameConfigFieldDefinition } from '../types'
+import {
+  CONFIG_ENUM_LABELS_PT,
+  CONFIG_FIELD_HINTS_PT,
+  CONFIG_FIELD_LABELS_PT
+} from '../constants/configFieldLabels'
+import { is_round_popup_list } from '../utils/roundPopups'
+import { RoundPopupsEditor } from './RoundPopupsEditor'
+import type { ConfigFieldValue, CreateConfigPayload, GameConfigFieldDefinition } from '../types'
 
 function Toggle({ value, onToggle }: { value: boolean; onToggle: (v: boolean) => void }) {
   return (
@@ -31,7 +37,6 @@ const select_class =
 
 const label_class = 'block text-sm font-medium text-foreground mb-2'
 
-const section_label_class = 'text-xs uppercase tracking-widest font-semibold text-muted-foreground mb-4'
 
 const parse_enum_options = (field_type: string): string[] => {
   const match = /^enum\((.+)\)$/.exec(field_type)
@@ -44,18 +49,17 @@ const parse_enum_options = (field_type: string): string[] => {
 
 interface ConfigurationFormProps {
   config: CreateConfigPayload
-  common_fields: GameConfigFieldDefinition[]
-  game_fields: GameConfigFieldDefinition[]
+  /** Campos desta etapa do assistente, em grade de 2 colunas para a tela não precisar rolar. */
+  fields: GameConfigFieldDefinition[]
   onChange: (config: CreateConfigPayload) => void
 }
 
 export function ConfigurationForm({
   config,
-  common_fields,
-  game_fields,
+  fields,
   onChange
 }: ConfigurationFormProps) {
-  const handleChange = (field: string, value: string | number | boolean) => {
+  const handleChange = (field: string, value: ConfigFieldValue) => {
     onChange({ ...config, [field]: value })
   }
 
@@ -65,6 +69,19 @@ export function ConfigurationForm({
     const field_label = CONFIG_FIELD_LABELS_PT[field.name] ?? humanizeLabel(field.name)
     const field_hint = CONFIG_FIELD_HINTS_PT[field.name]
     const field_value = config[field.name]
+
+    if (field.type === 'roundPopups') {
+      return (
+        <div key={field.name} className="sm:col-span-2">
+          <RoundPopupsEditor
+            label={field_label}
+            hint={field_hint}
+            popups={is_round_popup_list(field_value) ? field_value : []}
+            onChange={(popups) => handleChange(field.name, popups)}
+          />
+        </div>
+      )
+    }
 
     if (field.type === 'boolean') {
       return (
@@ -115,18 +132,19 @@ export function ConfigurationForm({
               {options.length === 0 && <option value="">Sem opções disponíveis</option>}
               {options.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {CONFIG_ENUM_LABELS_PT[option] ?? option}
                 </option>
               ))}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           </div>
+          {field_hint && <p className="text-xs text-muted-foreground mt-1">{field_hint}</p>}
         </div>
       )
     }
 
     return (
-      <div key={field.name}>
+      <div key={field.name} className="sm:col-span-2">
         <label htmlFor={`config-${field.name}`} className={label_class}>{field_label}</label>
         <input
           id={`config-${field.name}`}
@@ -139,24 +157,5 @@ export function ConfigurationForm({
     )
   }
 
-  return (
-    <div className="space-y-8">
-      <fieldset>
-        <legend className={section_label_class}>Configurações Comuns</legend>
-        <div className="space-y-4">
-          {common_fields.map(render_field)}
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend className={section_label_class}>Configurações Específicas do Jogo</legend>
-        <div className="space-y-4">
-          {game_fields.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhum campo específico para este jogo.</p>
-          )}
-          {game_fields.map(render_field)}
-        </div>
-      </fieldset>
-    </div>
-  )
+  return <div className="grid items-start gap-4 sm:grid-cols-2">{fields.map(render_field)}</div>
 }
