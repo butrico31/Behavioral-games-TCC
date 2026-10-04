@@ -4,6 +4,7 @@ import type {
   SessionResultsDetail,
   SessionResultsListItem
 } from '../types'
+import type { RouletteReport } from '../../roulette/types/roulette'
 
 export const reportsService = {
   getSessionsResults: async (): Promise<SessionResultsListItem[]> => {
@@ -24,6 +25,14 @@ export const reportsService = {
   ): Promise<MatchResultDetail> => {
     const response = await api_client.get<MatchResultDetail>(
       `/sessions/${sessionId}/results/${matchId}`
+    )
+    return response.data
+  },
+
+  /** Relatório completo de uma partida da roleta, calculado no backend. */
+  getRouletteMatchReport: async (sessionId: string, matchId: string): Promise<RouletteReport> => {
+    const response = await api_client.get<RouletteReport>(
+      `/sessions/${sessionId}/results/${matchId}/roulette-report`
     )
     return response.data
   }

@@ -89,6 +89,18 @@ export interface MatchSummary {
   matchTime: number | null
   moves: MatchMoves
   created_at: string
+  /** Só em sessões de roleta: resumo calculado no backend para a lista de partidas. */
+  rouletteSummary?: RouletteMatchSummary
+}
+
+export interface RouletteMatchSummary {
+  totalRounds: number
+  initMoney: number
+  finalCoins: number
+  netResult: number
+  goal: number
+  totalBet: number
+  endedReasonLabel: string
 }
 
 export interface SessionResultsDetail {

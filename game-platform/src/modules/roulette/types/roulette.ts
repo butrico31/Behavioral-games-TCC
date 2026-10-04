@@ -86,3 +86,76 @@ export interface RouletteSpinResponse {
   /** Mensagem do professor para a rodada seguinte; null quando não há. */
   nextPopup: string | null
 }
+
+// -- Relatório da partida (GET /roulette/matches/:id/report) --
+// Tudo calculado no backend (buildRouletteReport); são os mesmos números da planilha do e-mail.
+
+export type RouletteReportEmailStatus = 'none' | 'pending' | 'sent' | 'failed'
+
+export interface RouletteReportRound {
+  round: number
+  playedAt: string | null
+  /** Segundos desde a jogada anterior (na 1ª, desde a entrada na partida). */
+  secondsSinceLast: number | null
+  opcao: RouletteMoveOption
+  opcaoLabel: string
+  aposta: number
+  pocket: string | null
+  resultado: RouletteMoveOption | null
+  resultadoLabel: string | null
+  won: boolean
+  delta: number
+  coinsBefore: number
+  coinsAfter: number
+  winProbability: number | null
+  pityStreak: number | null
+  popupMessage: string | null
+  popupReadSeconds: number | null
+}
+
+export interface RouletteReportPopup {
+  round: number
+  message: string
+  shown: boolean
+  readSeconds: number | null
+}
+
+export interface RouletteReport {
+  match: {
+    id: string
+    status: string
+    startedAt: string | null
+    finishedAt: string | null
+    durationSeconds: number | null
+    endedReason: string | null
+    endedReasonLabel: string
+  }
+  session: { id: string; name: string; inviteCode: string }
+  player: { fields: Array<{ key: string; label: string; value: string }> }
+  summary: {
+    initMoney: number
+    finalCoins: number
+    goal: number
+    netResult: number
+    reachedGoal: boolean
+    totalRounds: number
+    wins: number
+    losses: number
+    winRate: number
+    totalBet: number
+    averageBet: number
+    maxBet: number
+    minBet: number
+    totalWon: number
+    totalLost: number
+    averageSecondsBetween: number | null
+    longestUnreinforcedStreak: number
+    betsByCondition: Array<{ id: RouletteMoveOption; label: string; count: number; total: number }>
+    popupsConfigured: number
+    popupsShown: number
+    averagePopupReadSeconds: number | null
+  }
+  rounds: RouletteReportRound[]
+  popups: RouletteReportPopup[]
+  email: { status: RouletteReportEmailStatus; to: string | null }
+}

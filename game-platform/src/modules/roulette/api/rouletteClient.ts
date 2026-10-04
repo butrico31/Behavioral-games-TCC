@@ -1,5 +1,10 @@
 import axios, { AxiosError } from 'axios'
-import type { RouletteMatchView, RouletteSpinRequest, RouletteSpinResponse } from '../types/roulette'
+import type {
+  RouletteMatchView,
+  RouletteReport,
+  RouletteSpinRequest,
+  RouletteSpinResponse,
+} from '../types/roulette'
 
 const roulette_api_url = import.meta.env.VITE_ROULETTE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -60,9 +65,14 @@ export class RouletteApiError extends Error {
   }
 }
 
-export async function joinRouletteMatch(matchId: string, playerId: string): Promise<RouletteMatchView> {
+/** `email` (opcional) é para onde o servidor manda o relatório quando a partida terminar. */
+export async function joinRouletteMatch(
+  matchId: string,
+  playerId: string,
+  email?: string
+): Promise<RouletteMatchView> {
   try {
-    const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/join`, undefined, {
+    const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/join`, email ? { email } : {}, {
       params: { playerId },
     })
     return response.data
@@ -92,6 +102,26 @@ export async function getRouletteMatchState(matchId: string): Promise<RouletteMa
 export async function finishRouletteMatch(matchId: string): Promise<RouletteMatchView> {
   try {
     const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/finish`)
+    return response.data
+  } catch (error) {
+    throw new RouletteApiError(resolveErrorMessage(error))
+  }
+}
+
+/** Avisa que o jogador fechou o popup da rodada: o servidor mede o tempo de leitura. */
+export async function ackRoulettePopup(matchId: string, playerId: string, round: number): Promise<void> {
+  try {
+    await roulette_client.post(`/roulette/matches/${matchId}/popup/ack`, { playerId, round })
+  } catch (error) {
+    throw new RouletteApiError(resolveErrorMessage(error))
+  }
+}
+
+export async function getRouletteReport(matchId: string, playerId: string): Promise<RouletteReport> {
+  try {
+    const response = await roulette_client.get<RouletteReport>(`/roulette/matches/${matchId}/report`, {
+      params: { playerId },
+    })
     return response.data
   } catch (error) {
     throw new RouletteApiError(resolveErrorMessage(error))

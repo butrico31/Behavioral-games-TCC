@@ -11,9 +11,13 @@ import type { PointsChartPoint } from '../utils/chart-data'
 
 interface PointsChartProps {
   data: PointsChartPoint[]
+  /** Nome do valor no eixo Y e no tooltip (padrão "Pontos"). */
+  valueLabel?: string
+  /** Nome do eixo X (padrão "Rodadas"). */
+  roundLabel?: string
 }
 
-export function PointsChart({ data }: PointsChartProps) {
+export function PointsChart({ data, valueLabel = 'Pontos', roundLabel = 'Rodadas' }: PointsChartProps) {
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
@@ -32,7 +36,7 @@ export function PointsChart({ data }: PointsChartProps) {
             stroke="var(--color-muted-foreground)"
             tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
             label={{
-              value: 'Rodadas',
+              value: roundLabel,
               position: 'insideBottom',
               offset: -4,
               fill: 'var(--color-muted-foreground)',
@@ -43,7 +47,7 @@ export function PointsChart({ data }: PointsChartProps) {
             stroke="var(--color-muted-foreground)"
             tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
             label={{
-              value: 'Pontos',
+              value: valueLabel,
               angle: -90,
               position: 'insideLeft',
               fill: 'var(--color-muted-foreground)',
@@ -58,7 +62,7 @@ export function PointsChart({ data }: PointsChartProps) {
               color: 'var(--color-foreground)'
             }}
             labelStyle={{ color: 'var(--color-muted-foreground)' }}
-            formatter={(value) => [value, 'Pontos']}
+            formatter={(value) => [value, valueLabel]}
             labelFormatter={(label) => `Rodada ${label}`}
           />
           <Line

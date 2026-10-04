@@ -1,6 +1,8 @@
 import { Suspense, lazy, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { RoundPopupModal } from '../components/RoundPopupModal'
+import { RouletteReportScreen } from '../components/RouletteReportScreen'
+import { useRouletteReport } from '../hooks/useRouletteReport'
 import { toTableLayout, type TableLayoutId } from '../config/tableLayouts'
 import { useRouletteMatch } from '../hooks/useRouletteMatch'
 import { TableOne } from '../tables/mesa1/TableOne'
@@ -65,6 +67,9 @@ export function RouletteGamePage() {
 
   const match = useRouletteMatch(matchId, playerId)
   const { view } = match
+  // Fim da partida: depois da última animação, a mesa dá lugar ao relatório (calculado no backend).
+  const showReport = view?.status === 'finished' && !match.busy
+  const { report, error: reportError } = useRouletteReport(matchId, playerId, showReport)
 
   if (!matchId || !playerId) {
     const missing = [!matchId ? 'matchId' : null, !playerId ? 'playerId' : null].filter(Boolean).join(', ')
@@ -105,6 +110,21 @@ export function RouletteGamePage() {
   const finished = view.status === 'finished'
   const ended = ENDED_COPY[view.endedReason ?? 'jogador']
 
+  if (showReport) {
+    return (
+      <div className="app-shell min-h-dvh w-full">
+        <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-10">
+          <div className="surface-panel flex flex-col gap-1 px-6 py-5 text-center sm:text-left">
+            <p className="heading-kicker">{ended.kicker}</p>
+            <h2 className={`text-2xl md:text-3xl ${ended.tone}`}>{ended.title}</h2>
+            <p className="text-sm text-muted-foreground">{ended.text}</p>
+          </div>
+        </div>
+        <RouletteReportScreen report={report} error={reportError} onBack={() => navigate('/sessions')} />
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell min-h-dvh w-full">
       <Suspense fallback={<p className="p-8 text-center text-sm text-muted-foreground">Preparando mesa de roleta...</p>}>
@@ -125,36 +145,6 @@ export function RouletteGamePage() {
         <RoundPopupModal round={match.popup.round} message={match.popup.message} onClose={match.closePopup} />
       )}
 
-      {finished && !match.busy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm">
-          <div className="surface-panel max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-center sm:p-8">
-            <p className="heading-kicker mb-3">{ended.kicker}</p>
-            <h2 className={`mb-3 text-3xl ${ended.tone}`}>{ended.title}</h2>
-            <p className="mb-6 text-sm text-muted-foreground">{ended.text}</p>
-            <div className="surface-subtle mb-6 grid grid-cols-2 gap-4 p-5 text-left">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Fichas finais</p>
-                <p className="font-display text-2xl text-foreground">{view.coins}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Meta</p>
-                <p className="font-display text-2xl text-foreground">{view.pointsLimit}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Rodadas</p>
-                <p className="font-display text-2xl text-foreground">{view.round}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Match</p>
-                <p className="break-all font-data text-xs text-muted-foreground">{view.matchId}</p>
-              </div>
-            </div>
-            <button type="button" onClick={() => navigate('/sessions')} className="btn-primary w-full">
-              Voltar às sessões
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

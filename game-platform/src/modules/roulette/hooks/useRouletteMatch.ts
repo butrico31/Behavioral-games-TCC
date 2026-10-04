@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { MATCH_SESSION_STORAGE_KEYS } from '../../../shared/constants/storageKeys'
 import {
   RouletteApiError,
+  ackRoulettePopup,
   finishRouletteMatch,
   getRouletteMatchState,
   joinRouletteMatch,
@@ -52,7 +54,16 @@ export function useRouletteMatch(matchId: string, playerId: string) {
     if (!matchId || !playerId) return
     let cancelled = false
 
-    joinRouletteMatch(matchId, playerId)
+    // O e-mail digitado na entrada vai para o servidor, que manda o relatório quando a partida
+    // terminar (fica só em memória lá, como no envio do Prisioneiro).
+    let email: string | undefined
+    try {
+      email = sessionStorage.getItem(MATCH_SESSION_STORAGE_KEYS.playerEmail)?.trim() || undefined
+    } catch {
+      email = undefined
+    }
+
+    joinRouletteMatch(matchId, playerId, email)
       .then((joined) => {
         if (cancelled) return
         applyView(joined)
@@ -137,7 +148,12 @@ export function useRouletteMatch(matchId: string, playerId: string) {
     [view, busy, inProgress, popup, playerId, applyView]
   )
 
-  const closePopup = useCallback(() => setPopup(null), [])
+  // Fechar o popup avisa o servidor, que mede o tempo de leitura para o relatório. Falha aqui não
+  // trava o jogo: a jogada só fica sem o tempo de leitura.
+  const closePopup = useCallback(() => {
+    if (popup) void ackRoulettePopup(matchId, playerId, popup.round).catch(() => undefined)
+    setPopup(null)
+  }, [popup, matchId, playerId])
 
   return {
     view,

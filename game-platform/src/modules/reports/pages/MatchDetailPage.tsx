@@ -16,6 +16,7 @@ import {
 } from '../utils/chart-data'
 import { PointsChart } from '../components/PointsChart'
 import { CooperationChart } from '../components/CooperationChart'
+import { RouletteMatchDetail } from '../components/RouletteMatchDetail'
 import { get_session_label } from '../../game-session/utils/session-label'
 import type { PlayerResultWithRole } from '../types'
 
@@ -54,6 +55,16 @@ export function MatchDetailPage() {
     () => (data ? compute_totals(data.match.moves) : { player1: 0, player2: 0 }),
     [data]
   )
+
+  // Roleta tem relatório próprio (jogadas, apostas, tempos e popups), calculado no backend.
+  if (data?.session.game === 'roulette' && sessionId && matchId) {
+    return (
+      <div className="app-shell">
+        <Header />
+        <RouletteMatchDetail sessionId={sessionId} matchId={matchId} />
+      </div>
+    )
+  }
 
   return (
     <div ref={root_ref} className="app-shell">

@@ -46,6 +46,8 @@ export function SessionMatchesPage() {
     deps: [data]
   })
 
+  const is_roulette = data?.session.game === 'roulette'
+
   const handleOpenMatch = (matchId: string) => {
     if (!sessionId) return
     navigate(`/reports/${sessionId}/matches/${matchId}`)
@@ -233,10 +235,21 @@ export function SessionMatchesPage() {
                         <th className="px-4 py-3 font-semibold">Partida</th>
                         <th className="px-4 py-3 font-semibold">Status</th>
                         <th className="px-4 py-3 font-semibold">RA</th>
-                        <th className="px-4 py-3 font-semibold">Jogador 1</th>
-                        <th className="px-4 py-3 font-semibold">Jogador 2</th>
-                        <th className="px-4 py-3 font-semibold">Rodadas</th>
-                        <th className="px-4 py-3 font-semibold">Placar</th>
+                        {is_roulette ? (
+                          <>
+                            <th className="px-4 py-3 font-semibold">Jogador</th>
+                            <th className="px-4 py-3 font-semibold">Jogadas</th>
+                            <th className="px-4 py-3 font-semibold">Fichas</th>
+                            <th className="px-4 py-3 font-semibold">Fim</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="px-4 py-3 font-semibold">Jogador 1</th>
+                            <th className="px-4 py-3 font-semibold">Jogador 2</th>
+                            <th className="px-4 py-3 font-semibold">Rodadas</th>
+                            <th className="px-4 py-3 font-semibold">Placar</th>
+                          </>
+                        )}
                         <th className="px-4 py-3 text-right font-semibold">Ações</th>
                       </tr>
                     </thead>
@@ -266,13 +279,44 @@ export function SessionMatchesPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-foreground" />
-                            <td className="px-4 py-3 font-semibold text-foreground">Jogador 1</td>
-                            <td className="px-4 py-3 font-semibold text-foreground">Jogador 2</td>
-                            <td className="px-4 py-3 text-foreground">{rounds_played}</td>
-                            <td className="px-4 py-3 text-lg font-bold text-foreground">
-                              {totals.player1} <span className="text-muted-foreground">x</span>{' '}
-                              {totals.player2}
-                            </td>
+                            {is_roulette ? (
+                              <>
+                                <td className="px-4 py-3 font-semibold text-foreground">Jogador</td>
+                                <td className="px-4 py-3 text-foreground">
+                                  {match.rouletteSummary?.totalRounds ?? rounds_played}
+                                </td>
+                                <td className="px-4 py-3 text-foreground">
+                                  {match.rouletteSummary ? (
+                                    <>
+                                      <span className="text-lg font-bold">{match.rouletteSummary.finalCoins}</span>{' '}
+                                      <span
+                                        className={`text-xs font-semibold ${
+                                          match.rouletteSummary.netResult >= 0 ? 'text-success' : 'text-destructive'
+                                        }`}
+                                      >
+                                        ({match.rouletteSummary.netResult > 0 ? '+' : ''}
+                                        {match.rouletteSummary.netResult})
+                                      </span>
+                                    </>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-muted-foreground">
+                                  {match.rouletteSummary?.endedReasonLabel ?? '—'}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-3 font-semibold text-foreground">Jogador 1</td>
+                                <td className="px-4 py-3 font-semibold text-foreground">Jogador 2</td>
+                                <td className="px-4 py-3 text-foreground">{rounds_played}</td>
+                                <td className="px-4 py-3 text-lg font-bold text-foreground">
+                                  {totals.player1} <span className="text-muted-foreground">x</span>{' '}
+                                  {totals.player2}
+                                </td>
+                              </>
+                            )}
                             <td className="px-4 py-3">
                               <div className="flex justify-end">
                                 <button
