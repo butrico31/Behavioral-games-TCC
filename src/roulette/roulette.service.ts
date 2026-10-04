@@ -1,4 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { SessionService } from '../session/session.service';
+import { MatchReportMailer } from '../mail/match-report-mailer.service';
+import {
+  buildRouletteReport,
+  type RouletteMatchResults,
+  type RouletteReport,
+  type RouletteReportEmailStatus,
+} from './report/roulette-report';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Match, MatchStatus, RouletteMoveOption } from '../match/match.entity';
@@ -39,13 +47,27 @@ export class RouletteService {
    * vai inteiro para o jogador: aqui ele só recebe a mensagem da rodada que está começando.
    */
   private readonly roundPopups = new Map<string, Record<number, string>>();
+  /**
+   * E-mail que o jogador digitou na entrada, para mandar o relatório no fim. Fica só em memória
+   * (não vai para o banco), como no envio do Prisioneiro.
+   */
+  private readonly reportEmails = new Map<string, string>();
+  private readonly emailStatus = new Map<string, RouletteReportEmailStatus>();
+  /** Popup entregue ao jogador (rodada + horário do servidor), para medir o tempo de leitura. */
+  private readonly popupDelivered = new Map<string, { round: number; at: number }>();
+  /** Tempo de leitura confirmado pelo jogador ao fechar o popup da rodada. */
+  private readonly popupRead = new Map<string, { round: number; seconds: number }>();
+  private readonly logger = new Logger(RouletteService.name);
 
   constructor(
     @InjectRepository(Match)
     private matchRepository: Repository<Match>,
+    private readonly sessionService: SessionService,
+    private readonly matchReportMailer: MatchReportMailer,
   ) {}
 
-  async initMatch(matchId: string, playerId: string): Promise<RouletteMatchState> {
+  async initMatch(matchId: string, playerId: string, email?: string): Promise<RouletteMatchState> {
+    if (email) this.reportEmails.set(matchId, email.trim());
     const existing = this.activeMatches.get(matchId);
     if (existing) {
       if (existing.playerId !== playerId) {
@@ -85,6 +107,7 @@ export class RouletteService {
     for (const move of ordered) pityStreak = move.winrate ? 0 : pityStreak + 1;
 
     const startedAt = Date.now();
+    const lastPlayedAt = last?.playedAt ? Date.parse(last.playedAt) : NaN;
     const state: RouletteMatchState = {
       matchId,
       sessionId: match.session_id,
@@ -95,6 +118,7 @@ export class RouletteService {
       timeLimit,
       startedAt,
       endsAt: timeLimit !== null ? startedAt + timeLimit * 1000 : null,
+      lastSpinAt: Number.isFinite(lastPlayedAt) ? lastPlayedAt : null,
       pityStreak,
       moves,
       status: 'in_progress',
@@ -119,9 +143,30 @@ export class RouletteService {
     return this.roundPopups.get(matchId)?.[round] ?? null;
   }
 
+  /** Popup da rodada `round` saindo para o jogador agora. Reenvio (recarregou) mantém o 1º horário. */
+  private deliverPopup(matchId: string, round: number): string | null {
+    const message = this.popupFor(matchId, round);
+    if (message && this.popupDelivered.get(matchId)?.round !== round) {
+      this.popupDelivered.set(matchId, { round, at: Date.now() });
+    }
+    return message;
+  }
+
+  /** O jogador fechou o popup: grava quanto tempo ele ficou aberto (relógio do servidor). */
+  acknowledgePopup(matchId: string, playerId: string, round: number): void {
+    const state = this.getState(matchId);
+    if (state.playerId !== playerId) {
+      throw new BadRequestException(`Player ${playerId} is not part of match ${matchId}`);
+    }
+    const delivered = this.popupDelivered.get(matchId);
+    if (!delivered || delivered.round !== round || this.popupRead.get(matchId)?.round === round) return;
+    this.popupRead.set(matchId, { round, seconds: Math.round((Date.now() - delivered.at) / 10) / 100 });
+  }
+
   toView(state: RouletteMatchState): RouletteMatchView {
     const inProgress = state.status === 'in_progress';
     const round = this.playedRounds(state);
+    const popup = inProgress ? this.deliverPopup(state.matchId, round + 1) : null;
     return {
       ...state,
       round,
@@ -130,7 +175,7 @@ export class RouletteService {
       conditions: ROULETTE_CONDITIONS,
       chipValues: ROULETTE_CHIP_VALUES,
       serverNow: Date.now(),
-      popup: inProgress ? this.popupFor(state.matchId, round + 1) : null,
+      popup,
     };
   }
 
@@ -156,6 +201,11 @@ export class RouletteService {
       throw new BadRequestException('A aposta passa do saldo de fichas.');
     }
 
+    const now = Date.now();
+    // Tempo de decisão medido no servidor: desde o giro anterior (ou desde a entrada, no 1º).
+    const secondsSinceLast = Math.round((now - (state.lastSpinAt ?? state.startedAt)) / 10) / 100;
+    state.lastSpinAt = now;
+
     const pocket = drawPocket();
     const won = pocket.condition === opcao;
     const delta = deltaFor(opcao, aposta, won);
@@ -166,7 +216,12 @@ export class RouletteService {
     state.pityStreak = won ? 0 : state.pityStreak + 1;
 
     const round = this.playedRounds(state) + 1;
+    const popupMessage = this.popupFor(matchId, round);
+    const read = this.popupRead.get(matchId);
+    const popupReadSeconds = popupMessage && read?.round === round ? read.seconds : undefined;
     state.moves[String(round)] = {
+      ...(popupMessage ? { popupMessage } : {}),
+      ...(popupReadSeconds !== undefined ? { popupReadSeconds } : {}),
       coinsAmount: state.coins,
       aposta,
       opcao,
@@ -176,6 +231,8 @@ export class RouletteService {
       pocket: pocket.label,
       resultado: pocket.condition,
       delta,
+      playedAt: new Date(now).toISOString(),
+      secondsSinceLast,
     };
 
     const endedReason: RouletteEndedReason | null =
@@ -198,7 +255,7 @@ export class RouletteService {
       maxMagnitude: Math.max(0, state.coins),
       matchFinished: endedReason !== null,
       endedReason,
-      nextPopup: endedReason ? null : this.popupFor(matchId, round + 1),
+      nextPopup: endedReason ? null : this.deliverPopup(matchId, round + 1),
     };
   }
 
@@ -210,10 +267,58 @@ export class RouletteService {
     const match = await this.matchRepository.findOne({ where: { id: state.matchId } });
     if (!match) throw new NotFoundException(`Match ${state.matchId} not found`);
 
+    const finishedAt = Date.now();
     match.moves = state.moves;
     match.status = MatchStatus.FINALIZADA;
+    match.endedReason = reason;
+    match.started_at = new Date(state.startedAt);
+    match.finished_at = new Date(finishedAt);
+    match.matchTime = Math.round((finishedAt - state.startedAt) / 1000);
     await this.matchRepository.save(match);
     this.roundPopups.delete(state.matchId);
+    this.popupDelivered.delete(state.matchId);
+    this.popupRead.delete(state.matchId);
+
+    // Não segura a resposta do último giro: o e-mail sai em segundo plano e o status fica
+    // disponível para a tela de relatório.
+    void this.emailReport(state);
+  }
+
+  private async emailReport(state: RouletteMatchState): Promise<void> {
+    const to = this.reportEmails.get(state.matchId);
+    if (!to) {
+      this.emailStatus.set(state.matchId, 'none');
+      return;
+    }
+    this.emailStatus.set(state.matchId, 'pending');
+    try {
+      await this.matchReportMailer.send(state.sessionId, state.matchId, [to]);
+      this.emailStatus.set(state.matchId, 'sent');
+    } catch (error) {
+      this.logger.error(`Falha ao enviar o relatório da partida ${state.matchId}: ${(error as Error).message}`);
+      this.emailStatus.set(state.matchId, 'failed');
+    }
+  }
+
+  /**
+   * Relatório da partida encerrada, calculado no backend a partir do que foi gravado no banco
+   * (o mesmo que vai na planilha por e-mail). Só o próprio jogador consulta.
+   */
+  async getReport(matchId: string, playerId: string): Promise<RouletteReport> {
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) throw new NotFoundException(`Match ${matchId} not found`);
+    if (match.player1_id !== playerId) {
+      throw new BadRequestException(`Player ${playerId} is not part of match ${matchId}`);
+    }
+    if (match.status !== MatchStatus.FINALIZADA) {
+      throw new BadRequestException('O relatório fica disponível quando a partida termina.');
+    }
+
+    const results = await this.sessionService.getMatchResults(match.session_id, matchId);
+    return buildRouletteReport(results as unknown as RouletteMatchResults, {
+      status: this.emailStatus.get(matchId) ?? 'none',
+      to: this.reportEmails.get(matchId) ?? null,
+    });
   }
 
   /**

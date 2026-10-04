@@ -20,6 +20,16 @@ export const PLAYER_OPTIONAL_FIELDS_LABELS = {
   profession: 'Profession',
 };
 
+/** Rótulos usados nos relatórios (planilhas e tela de resultado). */
+export const PLAYER_OPTIONAL_FIELDS_LABELS_PT: Record<string, string> = {
+  educationLevel: 'Escolaridade',
+  semester: 'Semestre',
+  course: 'Curso',
+  age: 'Idade',
+  gender: 'Gênero',
+  profession: 'Profissão',
+};
+
 export type PlayerOptionalField = typeof PLAYER_OPTIONAL_FIELDS[number];
 
 /**

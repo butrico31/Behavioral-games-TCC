@@ -313,6 +313,21 @@ export class SessionController {
     return this.sessionService.getMatchResults(id, matchId);
   }
 
+  @Get(':id/results/:matchId/roulette-report')
+  @ApiOperation({
+    summary: 'Relatório de uma partida da roleta (professor)',
+    description:
+      'Resumo, jogadas (tempo desde a última, aposta, saldo…) e popups calculados no servidor — ' +
+      'os mesmos números da planilha enviada por e-mail.',
+  })
+  @ApiParam({ name: 'id', description: 'Session ID' })
+  @ApiParam({ name: 'matchId', description: 'Match ID' })
+  @ApiResponse({ status: 400, description: 'A sessão não é de roleta' })
+  @ApiResponse({ status: 404, description: 'Session or match not found' })
+  getRouletteMatchReport(@Param('id') id: string, @Param('matchId') matchId: string) {
+    return this.sessionService.getRouletteMatchReport(id, matchId);
+  }
+
   @Get('codigo/:codigo')
   @ApiOperation({
     summary: 'Find session by invite code',

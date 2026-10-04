@@ -16,6 +16,10 @@ import { Match, MatchStatus } from '../match/match.entity';
 import { JoinSessionDto } from './dto/join-session.dto';
 import { User } from '../users/user.entity';
 import { PrisonerService } from '../prisoner/prisoner.service';
+import {
+  buildRouletteReport,
+  type RouletteMatchResults,
+} from '../roulette/report/roulette-report';
 
 @Injectable()
 export class SessionService {
@@ -91,7 +95,10 @@ export class SessionService {
       player2_id: match.player2_id ?? null,
       status: match.status,
       matchTime: match.matchTime ?? null,
+      endedReason: match.endedReason ?? null,
       moves: match.moves ?? {},
+      started_at: match.started_at ?? null,
+      finished_at: match.finished_at ?? null,
       created_at: match.created_at,
     };
   }
@@ -540,8 +547,39 @@ export class SessionService {
         finished_at: session.finished_at ?? null,
       },
       players: session.players,
-      matches: matches.map((match) => this.formatMatch(match)),
+      matches: matches.map((match) => {
+        const formatted = this.formatMatch(match);
+        if (session.game !== GameType.ROULETTE) return formatted;
+        // Roleta: o resumo de cada partida (para a lista do professor) sai daqui, calculado pelo
+        // mesmo buildRouletteReport do relatório completo.
+        const { summary, match: info } = buildRouletteReport({
+          session: { ...session, inputInfo: [] },
+          players: [],
+          match: formatted,
+        } as unknown as RouletteMatchResults);
+        return {
+          ...formatted,
+          rouletteSummary: {
+            totalRounds: summary.totalRounds,
+            initMoney: summary.initMoney,
+            finalCoins: summary.finalCoins,
+            netResult: summary.netResult,
+            goal: summary.goal,
+            totalBet: summary.totalBet,
+            endedReasonLabel: info.endedReasonLabel,
+          },
+        };
+      }),
     };
+  }
+
+  /** Relatório completo de uma partida da roleta para a tela do professor. */
+  async getRouletteMatchReport(sessionId: string, matchId: string) {
+    const results = await this.getMatchResults(sessionId, matchId);
+    if (results.session.game !== GameType.ROULETTE) {
+      throw new BadRequestException('Esta sessão não é do jogo da roleta.');
+    }
+    return buildRouletteReport(results as unknown as RouletteMatchResults);
   }
 
   async getMatchResults(sessionId: string, matchId: string) {

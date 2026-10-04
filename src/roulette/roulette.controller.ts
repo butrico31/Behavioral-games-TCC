@@ -2,7 +2,10 @@ import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RouletteService } from './roulette.service';
 import { SpinRouletteDto } from './dto/spin-roulette.dto';
+import { JoinRouletteDto } from './dto/join-roulette.dto';
+import { AckPopupDto } from './dto/ack-popup.dto';
 import type { RouletteMatchView, RouletteSpinResult } from './interfaces/roulette-match.interface';
+import type { RouletteReport } from './report/roulette-report';
 
 @ApiTags('Roulette')
 @ApiBearerAuth()
@@ -19,8 +22,9 @@ export class RouletteController {
   async join(
     @Param('matchId') matchId: string,
     @Query('playerId') playerId: string,
+    @Body() body: JoinRouletteDto,
   ): Promise<RouletteMatchView> {
-    const state = await this.rouletteService.initMatch(matchId, playerId);
+    const state = await this.rouletteService.initMatch(matchId, playerId, body?.email);
     return this.rouletteService.toView(state);
   }
 
@@ -55,5 +59,31 @@ export class RouletteController {
   @ApiParam({ name: 'matchId', description: 'Match ID' })
   async finish(@Param('matchId') matchId: string): Promise<RouletteMatchView> {
     return await this.rouletteService.finalizeMatch(matchId);
+  }
+
+  @Post(':matchId/popup/ack')
+  @ApiOperation({
+    summary: 'Jogador fechou o popup da rodada',
+    description: 'O servidor mede o tempo de leitura (entrega → fechamento) e grava na jogada daquela rodada.',
+  })
+  @ApiParam({ name: 'matchId', description: 'Match ID' })
+  ackPopup(@Param('matchId') matchId: string, @Body() body: AckPopupDto): { ok: true } {
+    this.rouletteService.acknowledgePopup(matchId, body.playerId, body.round);
+    return { ok: true };
+  }
+
+  @Get(':matchId/report')
+  @ApiOperation({
+    summary: 'Relatório da partida encerrada',
+    description:
+      'Resumo e jogadas (tempo desde a última, aposta, saldo…) calculados no servidor — os mesmos ' +
+      'números da planilha enviada por e-mail — e o status desse envio.',
+  })
+  @ApiParam({ name: 'matchId', description: 'Match ID' })
+  async report(
+    @Param('matchId') matchId: string,
+    @Query('playerId') playerId: string,
+  ): Promise<RouletteReport> {
+    return await this.rouletteService.getReport(matchId, playerId);
   }
 }

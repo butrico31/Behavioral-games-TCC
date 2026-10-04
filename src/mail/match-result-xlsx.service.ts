@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
+import type { RouletteReport } from '../roulette/report/roulette-report';
 
 interface PrisonerMove {
   player1Choice: 'cooperate' | 'defect';
@@ -83,6 +84,174 @@ export class MatchResultXlsxService {
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+  }
+
+  /**
+   * Mesmo layout da partida do Prisioneiro, para a roleta: cabeçalho, cartões (jogador e
+   * resultado) e a tabela de jogadas com a linha de Total. Os números vêm prontos do
+   * buildRouletteReport (backend), iguais aos que a tela final do jogador mostra.
+   */
+  async generateRoulette(report: RouletteReport): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Behavioral Games Platform';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Partida');
+    [10, 20, 16, 16, 12, 10, 16, 14, 12, 14, 44, 16].forEach((width, index) => {
+      sheet.getColumn(index + 1).width = width;
+    });
+
+    // Cabeçalho
+    sheet.mergeCells(1, 1, 1, 12);
+    this.setCell(sheet, 1, 1, 'Detalhes da Partida', { bold: true, color: WHITE, size: 14, fill: NAVY });
+    sheet.getRow(1).height = 26;
+    sheet.mergeCells(2, 1, 2, 12);
+    this.setCell(
+      sheet,
+      2,
+      1,
+      `Sessão: ${report.session.name}   ·   Jogo: Roleta   ·   Iniciada em: ${this.formatDate(report.match.startedAt)}`,
+      { color: 'FF44546A' },
+    );
+
+    const { summary } = report;
+    const card = (col: number, title: string, rows: Array<[string, ExcelJS.CellValue]>, start: number) => {
+      let r = start;
+      sheet.mergeCells(r, col, r, col + 3);
+      this.setCell(sheet, r, col, title, { bold: true, color: WHITE, fill: NAVY });
+      r++;
+      for (const [label, value] of rows) {
+        sheet.mergeCells(r, col, r, col + 1);
+        this.setCell(sheet, r, col, label, { bold: true, fill: LIGHT_BLUE });
+        sheet.mergeCells(r, col + 2, r, col + 3);
+        this.setCell(sheet, r, col + 2, value);
+        r++;
+      }
+      return r;
+    };
+
+    const playerRows: Array<[string, ExcelJS.CellValue]> = [
+      ['Fichas finais', summary.finalCoins],
+      ...report.player.fields.map((f): [string, ExcelJS.CellValue] => [f.label, f.value]),
+    ];
+    const resultRows: Array<[string, ExcelJS.CellValue]> = [
+      ['Fichas iniciais', summary.initMoney],
+      ['Meta', summary.goal],
+      ['Resultado líquido', summary.netResult],
+      ['Motivo do fim', report.match.endedReasonLabel],
+      ['Quantidade de jogadas', summary.totalRounds],
+      ['Vitórias / derrotas', `${summary.wins} / ${summary.losses}`],
+      ['Taxa de acerto', `${Math.round(summary.winRate * 100)}%`],
+      ['Total apostado', summary.totalBet],
+      ['Aposta média', summary.averageBet],
+      ['Maior / menor aposta', `${summary.maxBet} / ${summary.minBet}`],
+      ['Tempo médio entre jogadas (s)', summary.averageSecondsBetween ?? '-'],
+      ['Duração da partida (s)', report.match.durationSeconds ?? '-'],
+      ['Maior sequência sem reforço', summary.longestUnreinforcedStreak],
+      ['Popups exibidos', `${summary.popupsShown} de ${summary.popupsConfigured}`],
+      ['Leitura média do popup (s)', summary.averagePopupReadSeconds ?? '-'],
+    ];
+    const endPlayer = card(1, 'Jogador', playerRows, 4);
+    const endResult = card(6, 'Resultado', resultRows, 4);
+
+    // Tabela de jogadas
+    const startRow = Math.max(endPlayer, endResult) + 1;
+    const headers = [
+      'Rodada',
+      'Horário',
+      'Tempo desde a última (s)',
+      'Condição apostada',
+      'Aposta',
+      'Casa',
+      'Cor sorteada',
+      'Resultado',
+      'Variação',
+      'Saldo após',
+      'Popup antes da jogada',
+      'Leitura do popup (s)',
+    ];
+    headers.forEach((header, index) => {
+      this.setCell(sheet, startRow, index + 1, header, { bold: true, color: WHITE, fill: NAVY });
+    });
+
+    let row = startRow + 1;
+    report.rounds.forEach((round, index) => {
+      const fill = index % 2 === 1 ? 'FFF6F8FC' : undefined;
+      const values: ExcelJS.CellValue[] = [
+        round.round,
+        round.playedAt ? this.formatTime(round.playedAt) : '-',
+        round.secondsSinceLast ?? '-',
+        round.opcaoLabel,
+        round.aposta,
+        round.pocket ?? '-',
+        round.resultadoLabel ?? '-',
+        round.won ? 'Ganhou' : 'Perdeu',
+        round.delta,
+        round.coinsAfter,
+        round.popupMessage ?? '-',
+        round.popupReadSeconds ?? '-',
+      ];
+      values.forEach((value, col) => this.setCell(sheet, row, col + 1, value, { fill }));
+      row++;
+    });
+
+    if (report.rounds.length > 0) {
+      const total: ExcelJS.CellValue[] = [
+        'Total',
+        '',
+        summary.averageSecondsBetween !== null ? `média ${summary.averageSecondsBetween}` : '',
+        '',
+        summary.totalBet,
+        '',
+        '',
+        `${summary.wins} vitórias`,
+        summary.netResult,
+        summary.finalCoins,
+        `${summary.popupsShown} popups`,
+        summary.averagePopupReadSeconds !== null ? `média ${summary.averagePopupReadSeconds}` : '',
+      ];
+      total.forEach((value, col) => this.setCell(sheet, row, col + 1, value, { bold: true, fill: LIGHT_BLUE }));
+      row++;
+    }
+
+    // Popups configurados na sessão: o que apareceu, em qual rodada e quanto tempo ficou aberto.
+    if (report.popups.length > 0) {
+      row += 2;
+      sheet.mergeCells(row, 1, row, 12);
+      this.setCell(sheet, row, 1, 'Popups', { bold: true, color: WHITE, fill: NAVY });
+      row++;
+      const popupHeaders: Array<[number, number, string]> = [
+        [1, 1, 'Rodada'],
+        [2, 10, 'Mensagem'],
+        [11, 11, 'Exibido'],
+        [12, 12, 'Leitura (s)'],
+      ];
+      for (const [from, to, label] of popupHeaders) {
+        if (to > from) sheet.mergeCells(row, from, row, to);
+        this.setCell(sheet, row, from, label, { bold: true, fill: LIGHT_BLUE });
+      }
+      row++;
+      for (const popup of report.popups) {
+        this.setCell(sheet, row, 1, popup.round);
+        sheet.mergeCells(row, 2, row, 10);
+        this.setCell(sheet, row, 2, popup.message).alignment = { wrapText: true, vertical: 'top' };
+        this.setCell(sheet, row, 11, popup.shown ? 'Sim' : 'Não chegou à rodada');
+        this.setCell(sheet, row, 12, popup.readSeconds ?? '-');
+        row++;
+      }
+    }
+
+    sheet.autoFilter = { from: { row: startRow, column: 1 }, to: { row: startRow, column: headers.length } };
+    sheet.views = [{ state: 'frozen', ySplit: startRow }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  private formatTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
   private setCell(

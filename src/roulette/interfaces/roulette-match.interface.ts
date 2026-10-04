@@ -20,6 +20,8 @@ export interface RouletteMatchState {
   startedAt: number;
   /** Fim pelo tempo (epoch ms); null = sem limite. */
   endsAt: number | null;
+  /** Horário do último giro (epoch ms); null antes da 1ª jogada. Base do "tempo desde a última". */
+  lastSpinAt: number | null;
   /** Rodadas seguidas sem reforço. */
   pityStreak: number;
   moves: RouletteMoves;

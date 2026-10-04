@@ -16,10 +16,9 @@ import {
 import { SessionService } from '../session/session.service';
 import { MailService } from './mail.service';
 import { ReportXlsxService } from './report-xlsx.service';
-import { MatchResultXlsxService } from './match-result-xlsx.service';
+import { MatchReportMailer } from './match-report-mailer.service';
 import { SendReportEmailDto } from './dto/send-report-email.dto';
 import type { SessionReportData } from './report-xlsx.service';
-import type { MatchReportData } from './match-result-xlsx.service';
 
 @ApiTags('Mail')
 @ApiBearerAuth()
@@ -29,7 +28,7 @@ export class MailController {
     private readonly sessionService: SessionService,
     private readonly mailService: MailService,
     private readonly reportXlsxService: ReportXlsxService,
-    private readonly matchResultXlsxService: MatchResultXlsxService,
+    private readonly matchReportMailer: MatchReportMailer,
   ) {}
 
   @Post('report/email')
@@ -105,33 +104,7 @@ export class MailController {
     @Body() dto: SendReportEmailDto,
   ) {
     const emails = this.requireEmails(dto);
-
-    const matchReport = await this.sessionService.getMatchResults(id, matchId);
-    const report = matchReport as unknown as MatchReportData;
-    const buffer = await this.matchResultXlsxService.generate(report);
-
-    const sessionLabel =
-      report.session.session_name || report.session.inviteCode;
-    const filename = `relatorio-${sessionLabel}-partida.xlsx`.replace(
-      /\s+/g,
-      '-',
-    );
-
-    await this.mailService.sendMail({
-      to: emails,
-      subject: `Relatório da partida: ${sessionLabel}`,
-      text: `Segue em anexo o relatório da sua partida na sessão "${sessionLabel}" em formato Excel.`,
-      html: `<p>Segue em anexo o relatório da sua partida na sessão <strong>${sessionLabel}</strong> em formato Excel.</p>`,
-      attachments: [
-        {
-          filename,
-          content: buffer,
-          contentType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        },
-      ],
-    });
-
+    await this.matchReportMailer.send(id, matchId, emails);
     return { sent: true, recipients: emails };
   }
 

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
+import {
+  buildRouletteReport,
+  type RouletteMatchResults,
+} from '../roulette/report/roulette-report';
 
 /**
  * Shape returned by SessionService.getReport()/getSessionResults().
@@ -50,6 +54,12 @@ const SETTINGS_LABELS: Record<string, string> = {
   limitRounds: 'Limite de rodadas',
   roundTimeLimit: 'Tempo por rodada (s)',
   sessionTimeLimit: 'Tempo total da sessão (min)',
+  // roleta
+  timeLimit: 'Tempo limite (s)',
+  pointsLimit: 'Meta de fichas',
+  initMoney: 'Fichas iniciais',
+  tableLayout: 'Mesa',
+  roundPopups: 'Popups por rodada',
 };
 
 const NAVY = 'FF1F4E78';
@@ -261,9 +271,13 @@ export class ReportXlsxService {
         const row = sheet.getRow(rowNumber);
         row.getCell(1).value = SETTINGS_LABELS[key] ?? key;
         row.getCell(2).value =
-          typeof value === 'object'
-            ? JSON.stringify(value)
-            : (value as string | number | boolean);
+          key === 'roundPopups' && Array.isArray(value)
+            ? (value as Array<{ round: number; message: string }>)
+                .map((popup) => `Rodada ${popup.round}: ${popup.message}`)
+                .join('\n') || '-'
+            : typeof value === 'object'
+              ? JSON.stringify(value)
+              : (value as string | number | boolean);
         row.eachCell(
           { includeEmpty: true },
           (cell) => (cell.border = THIN_GRAY_BORDER),
@@ -349,6 +363,11 @@ export class ReportXlsxService {
     workbook: ExcelJS.Workbook,
     data: SessionReportData,
   ): void {
+    if (data.session.game === 'roulette') {
+      this.buildRouletteRoundsSheet(workbook, data);
+      return;
+    }
+
     const sheet = workbook.addWorksheet('Rodadas');
 
     sheet.columns = [
@@ -409,6 +428,84 @@ export class ReportXlsxService {
             pattern: 'solid',
             fgColor: { argb: LIGHT_BLUE },
           };
+          cell.border = THIN_GRAY_BORDER;
+        });
+      }
+    });
+
+    this.styleDataRows(sheet, 2);
+    this.asTable(sheet, 1);
+  }
+
+  /**
+   * Roleta: uma linha por jogada de cada partida, com os mesmos números do relatório da partida
+   * (buildRouletteReport): tempo desde a última jogada, aposta, saldo e popup.
+   */
+  private buildRouletteRoundsSheet(workbook: ExcelJS.Workbook, data: SessionReportData): void {
+    const sheet = workbook.addWorksheet('Rodadas');
+    sheet.columns = [
+      { header: 'Partida', key: 'match', width: 12 },
+      { header: 'Rodada', key: 'round', width: 9 },
+      { header: 'Horário', key: 'playedAt', width: 12 },
+      { header: 'Tempo desde a última (s)', key: 'secondsSinceLast', width: 14 },
+      { header: 'Condição apostada', key: 'opcao', width: 14 },
+      { header: 'Aposta', key: 'aposta', width: 10 },
+      { header: 'Casa', key: 'pocket', width: 8 },
+      { header: 'Cor sorteada', key: 'resultado', width: 13 },
+      { header: 'Resultado', key: 'won', width: 11 },
+      { header: 'Variação', key: 'delta', width: 10 },
+      { header: 'Saldo após', key: 'coinsAfter', width: 12 },
+      { header: 'Popup antes da jogada', key: 'popup', width: 40 },
+      { header: 'Leitura do popup (s)', key: 'popupRead', width: 14 },
+    ];
+    this.styleTableHeader(sheet.getRow(1));
+
+    data.matches.forEach((match, matchIndex) => {
+      const report = buildRouletteReport({
+        session: data.session,
+        players: [],
+        match: match as unknown as RouletteMatchResults['match'],
+      });
+
+      for (const round of report.rounds) {
+        sheet.addRow({
+          match: `Partida ${matchIndex + 1}`,
+          round: round.round,
+          playedAt: round.playedAt
+            ? new Date(round.playedAt).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })
+            : '-',
+          secondsSinceLast: round.secondsSinceLast ?? '-',
+          opcao: round.opcaoLabel,
+          aposta: round.aposta,
+          pocket: round.pocket ?? '-',
+          resultado: round.resultadoLabel ?? '-',
+          won: round.won ? 'Ganhou' : 'Perdeu',
+          delta: round.delta,
+          coinsAfter: round.coinsAfter,
+          popup: round.popupMessage ?? '',
+          popupRead: round.popupReadSeconds ?? '',
+        });
+      }
+
+      if (report.rounds.length > 0) {
+        const totalRow = sheet.addRow({
+          match: `Partida ${matchIndex + 1}`,
+          round: 'Total',
+          secondsSinceLast:
+            report.summary.averageSecondsBetween !== null ? `média ${report.summary.averageSecondsBetween}` : '',
+          aposta: report.summary.totalBet,
+          won: `${report.summary.wins} vitórias`,
+          delta: report.summary.netResult,
+          coinsAfter: report.summary.finalCoins,
+          popup: `${report.summary.popupsShown} popups`,
+        });
+        totalRow.font = { bold: true };
+        totalRow.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
           cell.border = THIN_GRAY_BORDER;
         });
       }

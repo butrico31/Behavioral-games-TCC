@@ -39,6 +39,14 @@ export interface RouletteRoundMove {
   resultado?: RouletteMoveOption;
   /** Variação do saldo nesta rodada. */
   delta?: number;
+  /** Horário do giro no relógio do servidor (ISO 8601). */
+  playedAt?: string;
+  /** Segundos desde a jogada anterior (na 1ª, desde a entrada na partida). */
+  secondsSinceLast?: number;
+  /** Mensagem do professor exibida antes desta jogada (popup da rodada). */
+  popupMessage?: string;
+  /** Segundos entre o servidor entregar o popup e o jogador fechá-lo; ausente se não fechou. */
+  popupReadSeconds?: number;
 }
 
 export interface PrisonerRoundMove {
@@ -99,6 +107,13 @@ export class Match {
     default: MatchStatus.AGUARDANDO,
   })
   status: MatchStatus;
+
+  /** Início e fim da partida em si (roleta): created_at é quando o jogador entrou na sessão. */
+  @Column({ type: 'timestamptz', nullable: true })
+  started_at?: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  finished_at?: Date | null;
 
   @CreateDateColumn()
   created_at: Date;
