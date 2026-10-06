@@ -64,6 +64,7 @@
 }
 .m2-stats { grid-area: stats; display: grid; gap: var(--gap); grid-template-columns: minmax(0, 2.6fr) repeat(4, minmax(0, 1fr)); }
 .m2-apparatus { grid-area: app; }
+.m2-card.m2-apparatus { padding: 10px; }
 .m2-controls { grid-area: ctl; }
 
 .m2-card { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(14px, 1.6vw, 22px); min-width: 0; }
@@ -93,8 +94,8 @@
 /* ---------- aparato ---------- */
 .m2-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .m2-panel-head h2 { font-size: 22px; font-weight: 600; font-family: var(--font); }
-.m2-apparatus-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(12px, 2vw, 28px); align-items: center; }
-.m2-wheel-wrap { width: 100%; max-width: 720px; margin: 0 auto; }
+.m2-apparatus-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: clamp(12px, 2vw, 28px); align-items: center; }
+.m2-wheel-wrap { width: 100%; margin: 0 auto; }
 .m2-log { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: #c5d3e4; }
 .m2-log .m2-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 .m2-log.is-error { color: #ff9b9b; }

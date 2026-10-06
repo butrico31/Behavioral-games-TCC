@@ -138,7 +138,7 @@ export function TableOne({
       </section>
 
       <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
-        <div className="surface-panel flex min-w-0 flex-col items-center gap-3 p-4 sm:p-5">
+        <div className="surface-panel flex min-w-0 flex-col items-center gap-3 p-[10px]">
           <div className="flex w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3 className="text-lg text-foreground">Aparato</h3>
             <span className="font-data text-[11px] text-muted-foreground">
@@ -146,7 +146,7 @@ export function TableOne({
             </span>
           </div>
 
-          <div className="w-full max-w-[min(580px,100%)]">
+          <div className="w-full">
             <WheelSvg wheel={view.wheel} rotation={rotation} spinSeconds={SPIN_SECONDS} winning={winning} />
           </div>
 
