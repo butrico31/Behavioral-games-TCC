@@ -96,6 +96,7 @@
 .m2-panel-head h2 { font-size: 22px; font-weight: 600; font-family: var(--font); }
 .m2-apparatus-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0; align-items: center; }
 .m2-wheel-wrap { width: 100%; margin: 0; }
+.m2-wheel-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 .m2-log { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: #c5d3e4; }
 .m2-log .m2-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 .m2-log.is-error { color: #ff9b9b; }

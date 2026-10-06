@@ -49,7 +49,9 @@ export const RouletteWheel = forwardRef<RouletteWheelHandle, Props>(function Rou
       transparent: true,
       banner: false,
       audio: { noAudio: true },
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      // NONE: o FIT mede o pai com getBoundingClientRect, que já vem encolhido pelo transform do
+      // FitToScreen — a roda encolhia duas vezes. O tamanho na tela vem do CSS (.m2-wheel-wrap canvas).
+      scale: { mode: Phaser.Scale.NONE },
       render: { antialias: true },
       scene,
     });
