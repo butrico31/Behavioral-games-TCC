@@ -94,8 +94,8 @@
 /* ---------- aparato ---------- */
 .m2-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .m2-panel-head h2 { font-size: 22px; font-weight: 600; font-family: var(--font); }
-.m2-apparatus-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: clamp(12px, 2vw, 28px); align-items: center; }
-.m2-wheel-wrap { width: 100%; margin: 0 auto; }
+.m2-apparatus-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0; align-items: center; }
+.m2-wheel-wrap { width: 100%; margin: 0; }
 .m2-log { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: #c5d3e4; }
 .m2-log .m2-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 .m2-log.is-error { color: #ff9b9b; }
@@ -213,7 +213,7 @@
 }
 @media (max-width: 820px) {
   .m2-apparatus-body { grid-template-columns: minmax(0, 1fr); }
-  .m2-wheel-wrap { max-width: 620px; }
+  .m2-wheel-wrap { max-width: 620px; margin: 0 auto; }
   .m2-controls { display: flex; }
   .m2-step + .m2-step { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
 }
