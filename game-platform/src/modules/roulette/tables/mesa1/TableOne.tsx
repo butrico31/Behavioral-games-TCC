@@ -146,7 +146,7 @@ export function TableOne({
             </span>
           </div>
 
-          <div className="w-full max-w-[min(440px,100%)]">
+          <div className="w-full max-w-[min(580px,100%)]">
             <WheelSvg wheel={view.wheel} rotation={rotation} spinSeconds={SPIN_SECONDS} winning={winning} />
           </div>
 
