@@ -54,6 +54,8 @@ export interface RouletteReportRound {
   popupMessage: string | null;
   /** Segundos que o popup ficou aberto; null se não houve ou não foi registrado. */
   popupReadSeconds: number | null;
+  /** true quando esta jogada zerou o saldo e ele foi reposto às fichas iniciais. */
+  refilled: boolean;
 }
 
 export interface RouletteReportPopup {
@@ -105,6 +107,8 @@ export interface RouletteReport {
     popupsConfigured: number;
     popupsShown: number;
     averagePopupReadSeconds: number | null;
+    /** Quantas vezes o saldo zerou e foi reposto às fichas iniciais nesta partida. */
+    refillsUsed: number;
   };
   rounds: RouletteReportRound[];
   popups: RouletteReportPopup[];
@@ -181,8 +185,11 @@ export function buildRouletteReport(
       pityStreak: typeof move.pityStreak === 'number' ? move.pityStreak : null,
       popupMessage: move.popupMessage ?? null,
       popupReadSeconds: typeof move.popupReadSeconds === 'number' ? move.popupReadSeconds : null,
+      refilled: move.refilled === true,
     };
   });
+
+  const refillsUsed = rounds.filter((r) => r.refilled).length;
 
   // Popups configurados na sessão, cruzados com as jogadas: aparece antes da rodada indicada.
   const byRound = new Map(rounds.map((r) => [r.round, r]));
@@ -257,6 +264,7 @@ export function buildRouletteReport(
       popupsShown: popups.filter((p) => p.shown).length,
       averagePopupReadSeconds:
         readTimes.length > 0 ? round2(readTimes.reduce((a, b) => a + b, 0) / readTimes.length) : null,
+      refillsUsed,
     },
     rounds,
     popups,

@@ -147,4 +147,13 @@ export class CreateSettingsDto {
   @IsOptional()
   @IsNumber()
   initMoney?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Disables the button that lets the player end the match voluntarily, keeping the current balance (Roulette only)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  disableGiveUp?: boolean;
 }

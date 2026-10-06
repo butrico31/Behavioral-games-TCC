@@ -153,6 +153,7 @@ export class SessionService {
           pointsLimit: dto.settings.pointsLimit,
           popup: dto.settings.popup,
           initMoney: dto.settings.initMoney,
+          disableGiveUp: dto.settings.disableGiveUp,
         },
         gameTypeMap[dto.game],
       );

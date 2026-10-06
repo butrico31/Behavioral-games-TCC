@@ -29,6 +29,13 @@ export interface RouletteMatchState {
   endedReason: RouletteEndedReason | null;
   /** Layout de mesa escolhido na configuração da sessão. */
   tableLayout: string;
+  /**
+   * Config da sessão: se o jogador PODE encerrar a partida voluntariamente. O valor efetivo
+   * (exposto em View/SpinResult) também libera depois da 1ª reposição — ver effectiveAllowGiveUp.
+   */
+  allowGiveUp: boolean;
+  /** Quantas vezes o saldo já foi reposto ao zerar (ver MAX_BANKRUPT_REFILLS). */
+  refillsUsed: number;
 }
 
 /** O que o jogador recebe ao entrar/consultar: estado + regras da mesa para desenhar. */
@@ -43,6 +50,8 @@ export interface RouletteMatchView extends RouletteMatchState {
   serverNow: number;
   /** Mensagem do professor para a rodada que vai começar; null quando não há. */
   popup: string | null;
+  /** Quantas reposições de saldo são permitidas antes de encerrar por 'saldo'. */
+  maxRefills: number;
 }
 
 export interface RouletteSpinResult {
@@ -63,4 +72,10 @@ export interface RouletteSpinResult {
   endedReason: RouletteEndedReason | null;
   /** Mensagem do professor para a rodada seguinte; null quando não há ou a partida acabou. */
   nextPopup: string | null;
+  /** true quando esta jogada zerou o saldo e ele foi reposto (a partida continuou). */
+  refilled: boolean;
+  /** Quantas reposições já foram usadas depois desta jogada. */
+  refillsUsed: number;
+  /** Valor efetivo depois desta jogada (ver effectiveAllowGiveUp). */
+  allowGiveUp: boolean;
 }

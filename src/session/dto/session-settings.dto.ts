@@ -144,4 +144,13 @@ export class SessionSettingsDto {
   @IsOptional()
   @IsNumber()
   initMoney?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Disables the button that lets the player end the match voluntarily, keeping the current balance (Roulette)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  disableGiveUp?: boolean;
 }

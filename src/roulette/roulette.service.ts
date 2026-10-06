@@ -23,6 +23,7 @@ import {
 import {
   DEFAULT_GOAL,
   DEFAULT_INIT_MONEY,
+  MAX_BANKRUPT_REFILLS,
   ROULETTE_CHIP_VALUES,
   ROULETTE_CONDITIONS,
   ROULETTE_WHEEL,
@@ -105,6 +106,7 @@ export class RouletteService {
     const last = ordered[ordered.length - 1];
     let pityStreak = 0;
     for (const move of ordered) pityStreak = move.winrate ? 0 : pityStreak + 1;
+    const refillsUsed = ordered.filter((move) => move.refilled).length;
 
     const startedAt = Date.now();
     const lastPlayedAt = last?.playedAt ? Date.parse(last.playedAt) : NaN;
@@ -124,6 +126,8 @@ export class RouletteService {
       status: 'in_progress',
       endedReason: null,
       tableLayout: settings?.tableLayout ?? DEFAULT_TABLE_LAYOUT,
+      allowGiveUp: !settings?.disableGiveUp,
+      refillsUsed,
     };
 
     this.activeMatches.set(matchId, state);
@@ -163,6 +167,14 @@ export class RouletteService {
     this.popupRead.set(matchId, { round, seconds: Math.round((Date.now() - delivered.at) / 10) / 100 });
   }
 
+  /**
+   * Config do professor pode bloquear a desistência, mas uma vez que o jogador já quebrou (saldo
+   * zerou e foi reposto) ao menos uma vez, o botão libera — ele já viveu o pior caso.
+   */
+  private effectiveAllowGiveUp(state: RouletteMatchState): boolean {
+    return state.allowGiveUp || state.refillsUsed > 0;
+  }
+
   toView(state: RouletteMatchState): RouletteMatchView {
     const inProgress = state.status === 'in_progress';
     const round = this.playedRounds(state);
@@ -176,6 +188,8 @@ export class RouletteService {
       chipValues: ROULETTE_CHIP_VALUES,
       serverNow: Date.now(),
       popup,
+      maxRefills: MAX_BANKRUPT_REFILLS,
+      allowGiveUp: this.effectiveAllowGiveUp(state),
     };
   }
 
@@ -215,6 +229,16 @@ export class RouletteService {
     state.coins += delta;
     state.pityStreak = won ? 0 : state.pityStreak + 1;
 
+    // Saldo zerou: repõe as fichas iniciais até MAX_BANKRUPT_REFILLS vezes antes de encerrar por
+    // 'saldo'. `delta` fica com o resultado natural da aposta (pro "Variação" do relatório bater
+    // com "Ganhou/Perdeu"); a reposição em si fica marcada em `refilled`, separada.
+    let refilled = false;
+    if (state.coins <= 0 && state.refillsUsed < MAX_BANKRUPT_REFILLS) {
+      state.refillsUsed += 1;
+      state.coins = state.initMoney;
+      refilled = true;
+    }
+
     const round = this.playedRounds(state) + 1;
     const popupMessage = this.popupFor(matchId, round);
     const read = this.popupRead.get(matchId);
@@ -222,6 +246,7 @@ export class RouletteService {
     state.moves[String(round)] = {
       ...(popupMessage ? { popupMessage } : {}),
       ...(popupReadSeconds !== undefined ? { popupReadSeconds } : {}),
+      ...(refilled ? { refilled: true } : {}),
       coinsAmount: state.coins,
       aposta,
       opcao,
@@ -256,6 +281,9 @@ export class RouletteService {
       matchFinished: endedReason !== null,
       endedReason,
       nextPopup: endedReason ? null : this.deliverPopup(matchId, round + 1),
+      refilled,
+      refillsUsed: state.refillsUsed,
+      allowGiveUp: this.effectiveAllowGiveUp(state),
     };
   }
 

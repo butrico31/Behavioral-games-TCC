@@ -85,6 +85,7 @@ export class SettingsService {
       { name: 'initMoney', type: 'number' },
       { name: 'tableLayout', type: `enum(${ROULETTE_TABLE_LAYOUTS.join(',')})` },
       { name: 'roundPopups', type: 'roundPopups' },
+      { name: 'disableGiveUp', type: 'boolean' },
     ];
 
     if (game === 'prisoner') {
@@ -128,6 +129,7 @@ export class SettingsService {
         initMoney,
         roundPopups: normalizeRoundPopups(dto.roundPopups),
         tableLayout: dto.tableLayout ?? DEFAULT_TABLE_LAYOUT,
+        disableGiveUp: dto.disableGiveUp ?? false,
       });
       settings = await this.settingsRouletteRepository.save(rouletteSettings);
     } else if (gameType === 'prisoner') {
@@ -201,6 +203,7 @@ export class SettingsService {
         settings.roundPopups = normalizeRoundPopups(dto.roundPopups);
       }
       if (dto.tableLayout !== undefined) settings.tableLayout = dto.tableLayout;
+      if (dto.disableGiveUp !== undefined) settings.disableGiveUp = dto.disableGiveUp;
       return await this.settingsRouletteRepository.save(settings);
     } else if (settings instanceof SettingsGamePrisoner) {
       if (dto.userViewPoints !== undefined) settings.userViewPoints = dto.userViewPoints;

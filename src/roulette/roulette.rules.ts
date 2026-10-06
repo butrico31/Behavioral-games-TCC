@@ -75,6 +75,9 @@ export const ROULETTE_CHIP_VALUES = [1, 5, 10, 25];
 export const DEFAULT_INIT_MONEY = 50;
 export const DEFAULT_GOAL = 300;
 
+/** Quantas vezes o saldo é reposto ao zerar antes de encerrar a partida por 'saldo'. */
+export const MAX_BANKRUPT_REFILLS = 2;
+
 /** Sorteio uniforme entre as 38 casas. */
 export function drawPocket(): RoulettePocket {
   return ROULETTE_WHEEL[randomInt(ROULETTE_WHEEL.length)];

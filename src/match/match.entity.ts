@@ -47,6 +47,8 @@ export interface RouletteRoundMove {
   popupMessage?: string;
   /** Segundos entre o servidor entregar o popup e o jogador fechá-lo; ausente se não fechou. */
   popupReadSeconds?: number;
+  /** true quando esta jogada zerou o saldo e ele foi reposto (a partida continuou). */
+  refilled?: boolean;
 }
 
 export interface PrisonerRoundMove {

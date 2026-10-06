@@ -45,4 +45,12 @@ export class SettingsGameRoulette extends Settings {
     nullable: true,
   })
   tableLayout: RouletteTableLayout;
+
+  /**
+   * Desliga o botão de encerrar a partida voluntariamente. Default false (permitido) — o
+   * formulário de configuração manda `false` para todo campo boolean não mexido, então o campo
+   * é "desligar", não "permitir", pra esse default bater com o que já era o comportamento.
+   */
+  @Column({ name: 'disablegiveup', type: 'boolean', default: false })
+  disableGiveUp: boolean;
 }
