@@ -129,6 +129,8 @@ export function useRouletteMatch(matchId: string, playerId: string) {
                 maxMagnitude: result.maxMagnitude,
                 status: result.matchFinished ? 'finished' : current.status,
                 endedReason: result.endedReason ?? current.endedReason,
+                refillsUsed: result.refillsUsed,
+                allowGiveUp: result.allowGiveUp,
               }
             : current
         )

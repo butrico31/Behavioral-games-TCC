@@ -197,41 +197,28 @@ export function TableOne({
               <span className="font-data text-xs text-orange-400">02</span>
               <span className="text-base text-foreground">Magnitude</span>
             </div>
-            <div className="flex items-stretch overflow-hidden rounded-xl border border-border/80">
-              <button
-                type="button"
-                aria-label="Diminuir"
-                onClick={() => setBet(Math.max(1, magnitude - 1))}
-                disabled={disabled || magnitude <= 1}
-                className="w-12 border-r border-border/80 bg-background/40 font-data text-lg text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                −
-              </button>
-              <div className="flex flex-1 items-center justify-center gap-2 py-1.5">
-                <span className="font-display text-xl leading-none text-foreground">{magnitude}</span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">fichas</span>
-              </div>
-              <button
-                type="button"
-                aria-label="Aumentar"
-                onClick={() => setBet(Math.min(limit, magnitude + 1))}
-                disabled={disabled || magnitude >= limit}
-                className="w-12 border-l border-border/80 bg-background/40 font-data text-lg text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                +
-              </button>
-            </div>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={limit}
+              value={magnitude}
+              onChange={(e) => setBet(Math.max(1, Math.min(limit, Number(e.target.value) || 1)))}
+              disabled={disabled}
+              aria-label="Valor da aposta"
+              className="min-h-11 w-full rounded-xl border border-border/80 bg-background/40 px-4 text-center font-display text-xl text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            />
             <div className="flex flex-wrap gap-2">
               {view.chipValues.map((value) => (
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setBet(Math.min(limit, value))}
+                  onClick={() => setBet((prev) => Math.min(limit, prev + value))}
                   disabled={disabled}
-                  aria-label={`Apostar ${value} fichas`}
+                  aria-label={`Acrescentar ${value} fichas à aposta`}
                   className="min-h-9 min-w-11 flex-1 rounded-lg border border-border/80 bg-background/40 font-data text-sm text-foreground transition-colors hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {value}
+                  +{value}
                 </button>
               ))}
             </div>
@@ -251,14 +238,16 @@ export function TableOne({
             >
               {busy ? 'Executando…' : 'Executar ensaio'}
             </button>
-            <button
-              type="button"
-              onClick={onFinish}
-              disabled={busy || finished}
-              className="btn-secondary w-full py-2 text-[11px] uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Encerrar sessão
-            </button>
+            {view.allowGiveUp && (
+              <button
+                type="button"
+                onClick={onFinish}
+                disabled={busy || finished}
+                className="btn-secondary w-full py-2 text-[11px] uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Encerrar sessão
+              </button>
+            )}
           </div>
         </div>
       </section>

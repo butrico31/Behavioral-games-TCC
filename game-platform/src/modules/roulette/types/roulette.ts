@@ -33,6 +33,8 @@ export interface RouletteStoredMove {
   pocket?: string
   resultado?: RouletteMoveOption
   delta?: number
+  /** true quando esta jogada zerou o saldo e ele foi reposto às fichas iniciais. */
+  refilled?: boolean
 }
 
 export interface RouletteMatchView {
@@ -51,6 +53,15 @@ export interface RouletteMatchView {
   status: RouletteMatchStatus
   endedReason: RouletteEndedReason | null
   tableLayout?: string
+  /**
+   * Se o jogador pode encerrar a partida voluntariamente agora (libera depois da 1ª reposição,
+   * mesmo quando o professor bloqueou a desistência na config).
+   */
+  allowGiveUp: boolean
+  /** Quantas vezes o saldo já foi reposto ao zerar. */
+  refillsUsed: number
+  /** Quantas reposições são permitidas antes de encerrar por 'saldo'. */
+  maxRefills: number
   /** Rodadas já jogadas. */
   round: number
   maxMagnitude: number
@@ -85,6 +96,12 @@ export interface RouletteSpinResponse {
   endedReason: RouletteEndedReason | null
   /** Mensagem do professor para a rodada seguinte; null quando não há. */
   nextPopup: string | null
+  /** true quando esta jogada zerou o saldo e ele foi reposto (a partida continuou). */
+  refilled: boolean
+  /** Quantas reposições já foram usadas depois desta jogada. */
+  refillsUsed: number
+  /** Valor efetivo depois desta jogada. */
+  allowGiveUp: boolean
 }
 
 // -- Relatório da partida (GET /roulette/matches/:id/report) --
@@ -111,6 +128,8 @@ export interface RouletteReportRound {
   pityStreak: number | null
   popupMessage: string | null
   popupReadSeconds: number | null
+  /** true quando esta jogada zerou o saldo e ele foi reposto às fichas iniciais. */
+  refilled: boolean
 }
 
 export interface RouletteReportPopup {
@@ -154,6 +173,8 @@ export interface RouletteReport {
     popupsConfigured: number
     popupsShown: number
     averagePopupReadSeconds: number | null
+    /** Quantas vezes o saldo zerou e foi reposto às fichas iniciais nesta partida. */
+    refillsUsed: number
   }
   rounds: RouletteReportRound[]
   popups: RouletteReportPopup[]

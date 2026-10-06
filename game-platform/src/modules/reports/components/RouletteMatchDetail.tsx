@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BarChart3 } from 'lucide-react'
 import { RouletteReportScreen } from '../../roulette/components/RouletteReportScreen'
 import { useRouletteMatchReport } from '../hooks/useRouletteMatchReport'
+import { MatchEmailSender } from './MatchEmailSender'
 import { PointsChart } from './PointsChart'
 
 interface RouletteMatchDetailProps {
@@ -33,7 +34,7 @@ export function RouletteMatchDetail({ sessionId, matchId }: RouletteMatchDetailP
 
   return (
     <>
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 md:pt-10">
         <button
           type="button"
           onClick={back}
@@ -42,6 +43,7 @@ export function RouletteMatchDetail({ sessionId, matchId }: RouletteMatchDetailP
           <ArrowLeft className="h-4 w-4" />
           Voltar para partidas
         </button>
+        <MatchEmailSender sessionId={sessionId} matchId={matchId} />
       </div>
 
       <RouletteReportScreen

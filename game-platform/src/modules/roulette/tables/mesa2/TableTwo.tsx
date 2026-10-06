@@ -221,12 +221,27 @@ export function TableTwo({
                     type="button"
                     className={`m2-chip m2-chip-${index % 4}`}
                     disabled={disabled}
-                    onClick={() => setBet(Math.min(limit, value))}
-                    aria-label={`Apostar ${value} fichas`}
+                    onClick={() => setBet((prev) => Math.min(limit, prev + value))}
+                    aria-label={`Acrescentar ${value} fichas à aposta`}
                   >
-                    {value}
+                    +{value}
                   </button>
                 ))}
+              </div>
+              <div className="m2-bet-input">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={limit}
+                  value={magnitude}
+                  onChange={(e) => setBet(Math.max(1, Math.min(limit, Number(e.target.value) || 1)))}
+                  disabled={disabled}
+                  aria-label="Digitar valor da aposta"
+                />
+                <button type="button" onClick={() => setBet(1)} disabled={disabled}>
+                  Limpar
+                </button>
               </div>
             </div>
 
@@ -237,9 +252,11 @@ export function TableTwo({
               <button type="button" className="m2-btn-primary" disabled={!canRun} onClick={run}>
                 {busy ? 'Girando…' : 'Executar ensaio'}
               </button>
-              <button type="button" className="m2-btn-secondary" disabled={busy || finished} onClick={onFinish}>
-                Encerrar sessão
-              </button>
+              {view.allowGiveUp && (
+                <button type="button" className="m2-btn-secondary" disabled={busy || finished} onClick={onFinish}>
+                  Encerrar sessão
+                </button>
+              )}
             </div>
           </aside>
         </main>

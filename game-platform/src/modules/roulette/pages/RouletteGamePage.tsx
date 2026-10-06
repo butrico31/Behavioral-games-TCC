@@ -1,13 +1,12 @@
-import { Suspense, lazy, useMemo } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { FitToScreen, MatchShell } from '../../game-session/components/MatchShell'
 import { RoundPopupModal } from '../components/RoundPopupModal'
-import { RouletteReportScreen } from '../components/RouletteReportScreen'
-import { useRouletteReport } from '../hooks/useRouletteReport'
+import { RouletteHowToPlayScreen } from '../components/RouletteHowToPlayScreen'
 import { toTableLayout, type TableLayoutId } from '../config/tableLayouts'
 import { useRouletteMatch } from '../hooks/useRouletteMatch'
 import { TableOne } from '../tables/mesa1/TableOne'
 import type { RouletteTableProps } from '../tables/types'
-import type { RouletteEndedReason } from '../types/roulette'
 import type { ComponentType } from 'react'
 
 // A mesa 2 traz o Phaser: só é baixada quando a sessão usa essa mesa.
@@ -16,33 +15,6 @@ const TableTwo = lazy(() => import('../tables/mesa2/TableTwo').then((m) => ({ de
 const TABLES: Record<TableLayoutId, ComponentType<RouletteTableProps>> = {
   mesa1: TableOne,
   mesa2: TableTwo,
-}
-
-const ENDED_COPY: Record<RouletteEndedReason, { kicker: string; title: string; text: string; tone: string }> = {
-  meta: {
-    kicker: 'Meta alcançada',
-    title: 'Meta alcançada!',
-    text: 'A sessão terminou com a meta de fichas atingida.',
-    tone: 'text-success',
-  },
-  saldo: {
-    kicker: 'Sessão encerrada',
-    title: 'Saldo zerado',
-    text: 'As fichas acabaram antes da meta ser atingida.',
-    tone: 'text-destructive',
-  },
-  tempo: {
-    kicker: 'Tempo encerrado',
-    title: 'Ensaio finalizado',
-    text: 'O tempo limite da sessão foi atingido.',
-    tone: 'text-foreground',
-  },
-  jogador: {
-    kicker: 'Sessão encerrada',
-    title: 'Ensaio finalizado',
-    text: 'A sessão foi encerrada.',
-    tone: 'text-foreground',
-  },
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -67,9 +39,21 @@ export function RouletteGamePage() {
 
   const match = useRouletteMatch(matchId, playerId)
   const { view } = match
-  // Fim da partida: depois da última animação, a mesa dá lugar ao relatório (calculado no backend).
-  const showReport = view?.status === 'finished' && !match.busy
-  const { report, error: reportError } = useRouletteReport(matchId, playerId, showReport)
+  const navigatedHomeRef = useRef(false)
+  const [tutorialDismissed, setTutorialDismissed] = useState(false)
+
+  // Fim da partida: o backend já manda o relatório por e-mail em segundo plano (fire-and-forget).
+  // O jogador só precisa ser avisado disso e voltar pro início.
+  useEffect(() => {
+    if (view?.status === 'finished' && !match.busy && !navigatedHomeRef.current) {
+      navigatedHomeRef.current = true
+      navigate('/', { replace: true, state: { toast: 'Relatório enviado para o seu e-mail.' } })
+    }
+  }, [view?.status, match.busy, navigate])
+
+  // Mostra o tutorial só na 1ª entrada: se a partida já tem rodadas (recarregou a página) ou já
+  // acabou, `view.round`/`status` já chegam refletindo isso, sem precisar de efeito.
+  const needsTutorial = view !== null && !tutorialDismissed && view.round === 0 && view.status !== 'finished'
 
   if (!matchId || !playerId) {
     const missing = [!matchId ? 'matchId' : null, !playerId ? 'playerId' : null].filter(Boolean).join(', ')
@@ -106,40 +90,36 @@ export function RouletteGamePage() {
     )
   }
 
-  const Table = TABLES[toTableLayout(view.tableLayout)]
-  const finished = view.status === 'finished'
-  const ended = ENDED_COPY[view.endedReason ?? 'jogador']
-
-  if (showReport) {
+  if (needsTutorial) {
     return (
-      <div className="app-shell min-h-dvh w-full">
-        <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-10">
-          <div className="surface-panel flex flex-col gap-1 px-6 py-5 text-center sm:text-left">
-            <p className="heading-kicker">{ended.kicker}</p>
-            <h2 className={`text-2xl md:text-3xl ${ended.tone}`}>{ended.title}</h2>
-            <p className="text-sm text-muted-foreground">{ended.text}</p>
-          </div>
-        </div>
-        <RouletteReportScreen report={report} error={reportError} onBack={() => navigate('/sessions')} />
-      </div>
+      <MatchShell>
+        <RouletteHowToPlayScreen view={view} onReady={() => setTutorialDismissed(true)} />
+      </MatchShell>
     )
   }
 
+  const Table = TABLES[toTableLayout(view.tableLayout)]
+  const finished = view.status === 'finished'
+
   return (
-    <div className="app-shell min-h-dvh w-full">
+    <div className="app-shell flex h-dvh w-screen flex-col overflow-hidden">
+      <main className="min-h-0 flex-1">
       <Suspense fallback={<p className="p-8 text-center text-sm text-muted-foreground">Preparando mesa de roleta...</p>}>
-      <Table
-        view={view}
-        busy={match.busy}
-        locked={match.popup !== null}
-        lastSpin={match.lastSpin}
-        actionError={match.actionError}
-        remainingSeconds={match.remainingSeconds}
-        elapsedSeconds={match.elapsedSeconds}
-        onSpin={match.spin}
-        onFinish={() => void match.finish()}
-      />
+      <FitToScreen>
+        <Table
+          view={view}
+          busy={match.busy}
+          locked={match.popup !== null}
+          lastSpin={match.lastSpin}
+          actionError={match.actionError}
+          remainingSeconds={match.remainingSeconds}
+          elapsedSeconds={match.elapsedSeconds}
+          onSpin={match.spin}
+          onFinish={() => void match.finish()}
+        />
+      </FitToScreen>
       </Suspense>
+      </main>
 
       {match.popup && !finished && (
         <RoundPopupModal round={match.popup.round} message={match.popup.message} onClose={match.closePopup} />

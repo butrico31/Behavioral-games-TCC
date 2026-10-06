@@ -166,7 +166,7 @@
 .m2-chips { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
 .m2-chip {
   --c: #e9edf2; --ink: #1d2733;
-  width: 46px; height: 46px; border-radius: 50%; border: 0; font-weight: 700; font-size: 13px; color: var(--ink);
+  width: 46px; height: 46px; border-radius: 50%; border: 0; font-weight: 700; font-size: 11px; color: var(--ink);
   background:
     radial-gradient(circle, var(--c) 0 52%, transparent 53%),
     repeating-conic-gradient(var(--c) 0 22.5deg, #ffffff 22.5deg 45deg);
@@ -178,6 +178,17 @@
 .m2-chip-1 { --c: #d2552b; --ink: #fff; }
 .m2-chip-2 { --c: #129a7c; --ink: #fff; }
 .m2-chip-3 { --c: #7c3ad8; --ink: #fff; }
+
+.m2-bet-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-top: 8px; }
+.m2-bet-input input {
+  min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: #091626;
+  color: var(--ink, #e9edf2); font-family: var(--mono); font-size: 16px; text-align: center; min-width: 0;
+}
+.m2-bet-input button {
+  min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-2); background: transparent;
+  color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.m2-bet-input button:hover:not(:disabled) { background: var(--panel-2); }
 
 .m2-btn-primary, .m2-btn-secondary {
   min-height: 48px; border-radius: 10px; font-family: var(--mono); font-weight: 700; font-size: 12px;

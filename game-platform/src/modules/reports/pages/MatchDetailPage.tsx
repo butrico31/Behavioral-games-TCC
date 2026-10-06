@@ -17,6 +17,7 @@ import {
 import { PointsChart } from '../components/PointsChart'
 import { CooperationChart } from '../components/CooperationChart'
 import { RouletteMatchDetail } from '../components/RouletteMatchDetail'
+import { MatchEmailSender } from '../components/MatchEmailSender'
 import { get_session_label } from '../../game-session/utils/session-label'
 import type { PlayerResultWithRole } from '../types'
 
@@ -71,14 +72,17 @@ export function MatchDetailPage() {
       <Header />
 
       <main className="mx-auto w-full max-w-7xl px-5 py-10 md:px-8 md:py-14">
-        <button
-          type="button"
-          onClick={() => navigate(sessionId ? `/reports/${sessionId}` : '/reports')}
-          className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para partidas
-        </button>
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={() => navigate(sessionId ? `/reports/${sessionId}` : '/reports')}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para partidas
+          </button>
+          {sessionId && matchId && <MatchEmailSender sessionId={sessionId} matchId={matchId} />}
+        </div>
 
         {is_loading && (
           <div className="surface-panel py-12 text-center text-sm text-muted-foreground">

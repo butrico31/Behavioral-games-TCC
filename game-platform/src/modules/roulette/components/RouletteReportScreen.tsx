@@ -70,6 +70,7 @@ export function RouletteReportScreen({
     ['Meta', String(summary.goal)],
     ['Resultado líquido', signed(summary.netResult)],
     ['Motivo do fim', report.match.endedReasonLabel],
+    ['Reposições de saldo', String(summary.refillsUsed)],
     ['Jogadas', String(summary.totalRounds)],
     ['Vitórias / derrotas', `${summary.wins} / ${summary.losses}`],
     ['Taxa de acerto', `${Math.round(summary.winRate * 100)}%`],
@@ -223,7 +224,17 @@ export function RouletteReportScreen({
                       {r.won ? 'Ganhou' : 'Perdeu'}
                     </td>
                     <td className={`px-3 py-3 ${r.delta >= 0 ? 'text-success' : 'text-destructive'}`}>{signed(r.delta)}</td>
-                    <td className="px-3 py-3 text-foreground">{r.coinsAfter}</td>
+                    <td className="px-3 py-3 text-foreground">
+                      {r.coinsAfter}
+                      {r.refilled && (
+                        <span
+                          title="Saldo zerou e foi reposto às fichas iniciais"
+                          className="ml-2 inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                        >
+                          Reposição
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-muted-foreground">
                       {r.popupMessage ? (
                         <span title={r.popupMessage} className="inline-flex items-center gap-1.5">

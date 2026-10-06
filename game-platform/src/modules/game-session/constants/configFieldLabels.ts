@@ -17,7 +17,8 @@ export const CONFIG_FIELD_LABELS_PT: Record<string, string> = {
   timeLimit: 'Tempo limite (segundos)',
   pointsLimit: 'Meta de fichas',
   initMoney: 'Fichas iniciais',
-  popup: 'Aviso na tela'
+  popup: 'Aviso na tela',
+  disableGiveUp: 'Bloquear desistência'
 }
 
 /** Texto de apoio abaixo do campo. O vazio tem significado, então precisa estar escrito. */
@@ -33,7 +34,9 @@ export const CONFIG_FIELD_HINTS_PT: Record<string, string> = {
     'A partida termina quando o saldo chega aqui. Precisa ser maior que as fichas iniciais. Vazio = 300.',
   tableLayout: 'Visual da mesa de roleta que o jogador vê durante a partida.',
   roundPopups:
-    'A mensagem aparece para o jogador antes do giro da rodada escolhida. Uma mensagem por rodada; se o jogador não chegar àquela rodada, ela não aparece.'
+    'A mensagem aparece para o jogador antes do giro da rodada escolhida. Uma mensagem por rodada; se o jogador não chegar àquela rodada, ela não aparece.',
+  disableGiveUp:
+    'Desligado (padrão), o jogador pode encerrar a partida a qualquer momento e sair com o saldo atual. Ligado, essa opção some — mas volta a aparecer assim que o saldo zerar pela primeira vez (as fichas são repostas até 2 vezes antes da partida terminar sozinha).'
 }
 
 /** Valores de campos enum -> texto exibido (o valor cru continua sendo o que vai para a API). */
