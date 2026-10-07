@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Brain } from 'lucide-react'
 import { useAuth } from '../../auth/hooks/useAuth'
 import { usePlayTheme } from '../hooks/usePlayTheme'
@@ -44,12 +44,10 @@ const PLAY_STYLES = `
 
 export function PlayLandingPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { is_authenticated } = useAuth()
   const { theme, toggleTheme } = usePlayTheme()
   const [is_modal_open, setIsModalOpen] = useState(false)
   const root_ref = useRef<HTMLDivElement | null>(null)
-  const [toast_message, setToastMessage] = useState<string | null>(null)
 
   useGsapReveal('[data-intro="title"], [data-intro="text"], [data-intro="cta"]', {
     root: root_ref,
@@ -57,18 +55,6 @@ export function PlayLandingPage() {
     duration: 0.7,
     stagger: 0.1
   })
-
-  // Chegou aqui vindo de uma partida (ex.: fim da roleta) com um aviso pra mostrar uma única vez.
-  useEffect(() => {
-    const state = location.state as { toast?: string } | null
-    if (state?.toast) {
-      setToastMessage(state.toast)
-      window.history.replaceState({}, document.title)
-      const timeout = setTimeout(() => setToastMessage(null), 2800)
-      return () => clearTimeout(timeout)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   return (
     <>
@@ -155,29 +141,6 @@ export function PlayLandingPage() {
         </footer>
 
         {is_modal_open && <PlayGameModal theme={theme} onClose={() => setIsModalOpen(false)} />}
-
-        {toast_message && (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              position: 'fixed',
-              right: 24,
-              bottom: 24,
-              zIndex: 50,
-              maxWidth: 360,
-              padding: '14px 18px',
-              borderRadius: 14,
-              background: 'var(--modal-bg)',
-              color: 'var(--modal-title)',
-              boxShadow: '0 20px 40px rgba(0,0,0,.25)',
-              fontSize: 14.5,
-              fontWeight: 600
-            }}
-          >
-            {toast_message}
-          </div>
-        )}
       </div>
     </>
   )

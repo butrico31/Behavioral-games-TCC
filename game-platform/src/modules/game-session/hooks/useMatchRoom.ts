@@ -36,7 +36,7 @@ export function useMatchRoom(sessionId: string) {
     let foundTimer: ReturnType<typeof setTimeout> | undefined
 
     const join = () => {
-      if (matchId) socket.emit("joinMatch", { matchId, playerId })
+      if (matchId) socket.emit("joinMatch", { matchId, playerId, email: matchSession.getPlayerEmail() })
     }
 
     // Quem entra primeiro ainda não tem partida: procura até ela ser criada.

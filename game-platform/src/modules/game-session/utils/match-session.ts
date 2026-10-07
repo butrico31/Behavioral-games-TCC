@@ -27,6 +27,9 @@ function writeJson(key: string, data: unknown): void {
 export const matchSession = {
   getPlayerId: (): string => sessionStorage.getItem(KEYS.playerId) ?? '',
 
+  // undefined (não '') quando vazio: o backend valida com @IsOptional + @IsEmail, e '' não passa.
+  getPlayerEmail: (): string | undefined => sessionStorage.getItem(KEYS.playerEmail)?.trim() || undefined,
+
   getMatchId: (): string => sessionStorage.getItem(KEYS.matchId) ?? '',
   setMatchId: (id: string): void => sessionStorage.setItem(KEYS.matchId, id),
 

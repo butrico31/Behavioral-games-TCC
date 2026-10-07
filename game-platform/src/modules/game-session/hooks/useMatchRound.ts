@@ -299,7 +299,7 @@ export function useMatchRound() {
     const arrived = <T extends object>(d: T) => ({ ...d, receivedAt: Date.now() })
 
     // Recarregou a página: reentra na partida e o servidor responde com matchReady ou matchFinished.
-    const join = () => socket.emit("joinMatch", { matchId, playerId })
+    const join = () => socket.emit("joinMatch", { matchId, playerId, email: matchSession.getPlayerEmail() })
 
     const onMatchReady = (d: MatchReadyData) => {
       const data = arrived(d)

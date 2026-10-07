@@ -19,7 +19,7 @@ export interface RouletteTableProps {
 export function describeSpin(spin: RouletteSpinResponse, conditionLabel: (id: RouletteMoveOption) => string): string {
   const where = `Casa ${spin.pocket} (${conditionLabel(spin.resultado)})`
   const outcome = spin.won
-    ? `${where}. Reforço: +${spin.delta} fichas.`
+    ? `${where}. Ganhou: sua aposta de ${spin.aposta} voltou + ${spin.delta} de lucro.`
     : `${where}. Sem reforço: −${spin.aposta} fichas.`
   return spin.refilled ? `${outcome} Fichas zeraram e foram repostas (reposição ${spin.refillsUsed}).` : outcome
 }

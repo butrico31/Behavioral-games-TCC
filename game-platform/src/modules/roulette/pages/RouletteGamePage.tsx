@@ -1,7 +1,9 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FitToScreen, MatchShell } from '../../game-session/components/MatchShell'
+import { MATCH_SESSION_STORAGE_KEYS } from '../../../shared/constants/storageKeys'
 import { RoundPopupModal } from '../components/RoundPopupModal'
+import { RouletteFinalScreen } from '../components/RouletteFinalScreen'
 import { RouletteHowToPlayScreen } from '../components/RouletteHowToPlayScreen'
 import { toTableLayout, type TableLayoutId } from '../config/tableLayouts'
 import { useRouletteMatch } from '../hooks/useRouletteMatch'
@@ -39,17 +41,9 @@ export function RouletteGamePage() {
 
   const match = useRouletteMatch(matchId, playerId)
   const { view } = match
-  const navigatedHomeRef = useRef(false)
   const [tutorialDismissed, setTutorialDismissed] = useState(false)
-
-  // Fim da partida: o backend já manda o relatório por e-mail em segundo plano (fire-and-forget).
-  // O jogador só precisa ser avisado disso e voltar pro início.
-  useEffect(() => {
-    if (view?.status === 'finished' && !match.busy && !navigatedHomeRef.current) {
-      navigatedHomeRef.current = true
-      navigate('/', { replace: true, state: { toast: 'Relatório enviado para o seu e-mail.' } })
-    }
-  }, [view?.status, match.busy, navigate])
+  // O backend manda o relatório sozinho no fim (se houver e-mail); a tela final só avisa.
+  const [email] = useState(() => sessionStorage.getItem(MATCH_SESSION_STORAGE_KEYS.playerEmail)?.trim() || null)
 
   // Mostra o tutorial só na 1ª entrada: se a partida já tem rodadas (recarregou a página) ou já
   // acabou, `view.round`/`status` já chegam refletindo isso, sem precisar de efeito.
@@ -94,6 +88,15 @@ export function RouletteGamePage() {
     return (
       <MatchShell>
         <RouletteHowToPlayScreen view={view} onReady={() => setTutorialDismissed(true)} />
+      </MatchShell>
+    )
+  }
+
+  // Espera a animação do último giro (busy) antes de trocar a mesa pela tela final.
+  if (view.status === 'finished' && !match.busy) {
+    return (
+      <MatchShell>
+        <RouletteFinalScreen view={view} email={email} onExit={() => navigate('/', { replace: true })} />
       </MatchShell>
     )
   }

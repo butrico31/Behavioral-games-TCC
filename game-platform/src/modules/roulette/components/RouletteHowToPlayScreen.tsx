@@ -47,6 +47,10 @@ export function RouletteHowToPlayScreen({ view, onReady }: RouletteHowToPlayScre
       <section className="flex min-h-0 flex-col gap-2 rounded-[20px] border-2 border-[#E6EEF6] bg-[#F7FAFD] p-4 text-sm font-medium leading-relaxed text-[#3C4654]">
         <p>Escolha uma condição, defina a magnitude (fichas ou digite o valor) e execute o ensaio.</p>
         <p>
+          Se ganhar, a aposta volta pra você junto com o lucro: "paga 2×" devolve a aposta e soma o mesmo valor de
+          lucro. Se perder, a aposta fica com a banca.
+        </p>
+        <p>
           Se o saldo zerar, ele é reposto automaticamente às fichas iniciais até {view.maxRefills}{' '}
           {view.maxRefills === 1 ? 'vez' : 'vezes'} antes da partida encerrar.
         </p>
