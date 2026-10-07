@@ -1,6 +1,7 @@
 import { api_client } from '../../../infrastructure/api/api-client'
 import type {
   Session,
+  PublicSession,
   JoinSessionPayload,
   JoinSessionResponse,
   GameConfig,
@@ -39,6 +40,14 @@ export const sessionService = {
 
   createSession: async (payload: CreateSessionPayload): Promise<CreateSessionResponse> => {
     const response = await api_client.post<CreateSessionResponse>('/sessions', payload)
+    return response.data
+  },
+
+  /** Busca da tela de entrada: uma sessão só, pelo código, sempre do servidor (sem cache). */
+  getSessionByCode: async (code: string): Promise<PublicSession> => {
+    const response = await api_client.get<PublicSession>(
+      `/sessions/codigo/${encodeURIComponent(code.trim().toUpperCase())}`
+    )
     return response.data
   },
 

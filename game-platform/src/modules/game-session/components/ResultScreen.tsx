@@ -13,6 +13,12 @@ type Props = {
   opponentName?: string
 }
 
+const ENDED_REASON_TEXT: Record<Exclude<MatchEndedReason, 'rodadas'>, string> = {
+  tempo_sessao: 'O tempo da sessão terminou',
+  sessao_encerrada: 'O professor encerrou a sessão',
+  abandono: 'Um dos jogadores saiu da partida, então ela foi encerrada',
+}
+
 /** Tela de resultado final da partida. */
 export function ResultScreen({
   youScore,
@@ -31,7 +37,7 @@ export function ResultScreen({
   const aviso =
     endedReason === 'rodadas'
       ? null
-      : `${endedReason === 'tempo_sessao' ? 'O tempo da sessão terminou' : 'O professor encerrou a sessão'}. ` +
+      : `${ENDED_REASON_TEXT[endedReason]}. ` +
         `Valem as ${jogadas} ${jogadas === 1 ? 'rodada jogada' : 'rodadas jogadas'}.` +
         (interruptedRound ? ` A rodada ${interruptedRound} foi interrompida e não vale pontos.` : '')
 

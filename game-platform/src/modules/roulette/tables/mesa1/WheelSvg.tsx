@@ -42,11 +42,11 @@ export function WheelSvg({ wheel, rotation, spinSeconds, winning, centerLabel }:
   return (
     <div className="relative w-full">
       <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2" aria-hidden="true">
-        <div className="h-0 w-0 border-x-[9px] border-t-[18px] border-x-transparent border-t-foreground" />
+        <div className="h-0 w-0 border-x-[9px] border-t-[18px] border-x-transparent border-t-[#12151B]" />
       </div>
 
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="block h-auto w-full" role="img" aria-label="Roleta">
-        <circle cx={C} cy={C} r={R_OUTER + 8} className="fill-card stroke-border" strokeWidth={2} />
+        <circle cx={C} cy={C} r={R_OUTER + 8} fill="#FFFFFF" stroke="#E1E8F0" strokeWidth={3} />
 
         <g
           style={{
@@ -97,10 +97,10 @@ export function WheelSvg({ wheel, rotation, spinSeconds, winning, centerLabel }:
               <line key={index} x1={x0} y1={y0} x2={x1} y2={y1} stroke="rgba(255,255,255,0.35)" strokeWidth={1} />
             )
           })}
-          <circle cx={C} cy={C} r={R_INNER} className="fill-secondary" />
+          <circle cx={C} cy={C} r={R_INNER} fill="#EEF3F8" />
         </g>
 
-        <circle cx={C} cy={C} r={R_HUB} className="fill-card stroke-border" strokeWidth={2} />
+        <circle cx={C} cy={C} r={R_HUB} fill="#FFFFFF" stroke="#E1E8F0" strokeWidth={3} />
         {centerLabel && (
           <text
             x={C}
@@ -109,7 +109,7 @@ export function WheelSvg({ wheel, rotation, spinSeconds, winning, centerLabel }:
             dominantBaseline="central"
             fontSize={20}
             fontWeight={700}
-            className="fill-foreground"
+            fill="#12151B"
           >
             {centerLabel}
           </text>

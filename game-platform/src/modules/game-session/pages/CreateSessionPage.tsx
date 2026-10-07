@@ -47,6 +47,9 @@ const parse_enum_default =(field_type: string): string => {
     .filter(Boolean)[0] ?? ''
 }
 
+/** Valor inicial de campos cujo 0 já tem significado (ex.: 0 reposições = nenhuma). */
+const FIELD_DEFAULTS: Record<string, ConfigFieldValue> = { maxRefills: 2 }
+
 const default_value_for_type = (field_type: string): ConfigFieldValue => {
   if (field_type === 'roundPopups') return []
   if (field_type === 'boolean') return false
@@ -202,7 +205,7 @@ export function CreateSessionPage() {
         }
 
         if (acc[field.name] === undefined) {
-          acc[field.name] = default_value_for_type(field.type)
+          acc[field.name] = FIELD_DEFAULTS[field.name] ?? default_value_for_type(field.type)
         }
 
         return acc

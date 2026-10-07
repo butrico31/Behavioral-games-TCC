@@ -18,7 +18,8 @@ export const CONFIG_FIELD_LABELS_PT: Record<string, string> = {
   pointsLimit: 'Meta de fichas',
   initMoney: 'Fichas iniciais',
   popup: 'Aviso na tela',
-  disableGiveUp: 'Bloquear desistência'
+  disableGiveUp: 'Bloquear desistência',
+  maxRefills: 'Reposições de fichas'
 }
 
 /** Texto de apoio abaixo do campo. O vazio tem significado, então precisa estar escrito. */
@@ -36,7 +37,9 @@ export const CONFIG_FIELD_HINTS_PT: Record<string, string> = {
   roundPopups:
     'A mensagem aparece para o jogador antes do giro da rodada escolhida. Uma mensagem por rodada; se o jogador não chegar àquela rodada, ela não aparece.',
   disableGiveUp:
-    'Desligado (padrão), o jogador pode encerrar a partida a qualquer momento e sair com o saldo atual. Ligado, essa opção some — mas volta a aparecer assim que o saldo zerar pela primeira vez (as fichas são repostas até 2 vezes antes da partida terminar sozinha).'
+    'Desligado (padrão), o jogador pode encerrar a partida a qualquer momento e sair com o saldo atual. Ligado, essa opção some — mas volta a aparecer assim que o saldo zerar pela primeira vez (veja "Reposições de fichas").',
+  maxRefills:
+    'Quantas vezes o jogador recebe as fichas iniciais de novo quando o saldo zera. Depois disso, a partida termina. 0 = sem reposição. Padrão: 2.'
 }
 
 /** Valores de campos enum -> texto exibido (o valor cru continua sendo o que vai para a API). */

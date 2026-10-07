@@ -43,7 +43,7 @@ export function BettingTable({ wheel, conditions, selected, winning, disabled, t
             <div className="m2-bt-zero">{zeros.map(cell)}</div>
             {numbers.map(cell)}
           </div>
-          <div className="m2-bt-conds" role="radiogroup" aria-label="Condição">
+          <div className="m2-bt-conds" role="radiogroup" aria-label="Cor da aposta">
             {conditions.map((condition) => (
               <button
                 key={condition.id}

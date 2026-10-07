@@ -2,6 +2,7 @@ import { Suspense, lazy, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FitToScreen, MatchShell } from '../../game-session/components/MatchShell'
 import { MATCH_SESSION_STORAGE_KEYS } from '../../../shared/constants/storageKeys'
+import { RefillNoticeModal } from '../components/RefillNoticeModal'
 import { RoundPopupModal } from '../components/RoundPopupModal'
 import { RouletteFinalScreen } from '../components/RouletteFinalScreen'
 import { RouletteHowToPlayScreen } from '../components/RouletteHowToPlayScreen'
@@ -41,13 +42,12 @@ export function RouletteGamePage() {
 
   const match = useRouletteMatch(matchId, playerId)
   const { view } = match
-  const [tutorialDismissed, setTutorialDismissed] = useState(false)
   // O backend manda o relatório sozinho no fim (se houver e-mail); a tela final só avisa.
   const [email] = useState(() => sessionStorage.getItem(MATCH_SESSION_STORAGE_KEYS.playerEmail)?.trim() || null)
 
-  // Mostra o tutorial só na 1ª entrada: se a partida já tem rodadas (recarregou a página) ou já
-  // acabou, `view.round`/`status` já chegam refletindo isso, sem precisar de efeito.
-  const needsTutorial = view !== null && !tutorialDismissed && view.round === 0 && view.status !== 'finished'
+  // Instruções enquanto o servidor diz 'waiting': o relógio da partida só começa quando o jogador
+  // clica "Estou pronto" (start). Recarregar a página nessa etapa volta para cá.
+  const needsTutorial = view?.status === 'waiting'
 
   if (!matchId || !playerId) {
     const missing = [!matchId ? 'matchId' : null, !playerId ? 'playerId' : null].filter(Boolean).join(', ')
@@ -69,7 +69,7 @@ export function RouletteGamePage() {
     return (
       <Centered>
         <div className="surface-panel w-full p-6 sm:p-10">
-          <h1 className="mb-4 text-3xl text-foreground">Não foi possível iniciar o ensaio</h1>
+          <h1 className="mb-4 text-3xl text-foreground">Não foi possível iniciar a partida</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">{match.loadError}</p>
         </div>
       </Centered>
@@ -87,7 +87,7 @@ export function RouletteGamePage() {
   if (needsTutorial) {
     return (
       <MatchShell>
-        <RouletteHowToPlayScreen view={view} onReady={() => setTutorialDismissed(true)} />
+        <RouletteHowToPlayScreen view={view} starting={match.starting} error={match.actionError} onReady={() => void match.start()} />
       </MatchShell>
     )
   }
@@ -104,30 +104,33 @@ export function RouletteGamePage() {
   const Table = TABLES[toTableLayout(view.tableLayout)]
   const finished = view.status === 'finished'
 
+  // Mesmo fundo e cabeçalho do jogo das cartas; o FitToScreen encolhe a mesa em vez de rolar,
+  // então ela nunca passa de 100dvh × 100vw.
   return (
-    <div className="app-shell flex h-dvh w-screen flex-col overflow-hidden">
-      <main className="min-h-0 flex-1">
-      <Suspense fallback={<p className="p-8 text-center text-sm text-muted-foreground">Preparando mesa de roleta...</p>}>
-      <FitToScreen>
-        <Table
-          view={view}
-          busy={match.busy}
-          locked={match.popup !== null}
-          lastSpin={match.lastSpin}
-          actionError={match.actionError}
-          remainingSeconds={match.remainingSeconds}
-          elapsedSeconds={match.elapsedSeconds}
-          onSpin={match.spin}
-          onFinish={() => void match.finish()}
-        />
-      </FitToScreen>
-      </Suspense>
-      </main>
+    <div className="w-screen max-w-[100vw] overflow-hidden">
+      <MatchShell>
+        <Suspense fallback={<p className="text-center text-sm font-semibold text-[#5C6675]">Preparando a mesa…</p>}>
+          <FitToScreen>
+            <Table
+              view={view}
+              busy={match.busy}
+              locked={match.popup !== null || match.refill !== null}
+              lastSpin={match.lastSpin}
+              actionError={match.actionError}
+              remainingSeconds={match.remainingSeconds}
+              elapsedSeconds={match.elapsedSeconds}
+              onSpin={match.spin}
+              onFinish={() => void match.finish()}
+            />
+          </FitToScreen>
+        </Suspense>
+      </MatchShell>
 
-      {match.popup && !finished && (
+      {/* Reposição primeiro (é do giro que acabou); o aviso do professor vem depois, para a rodada seguinte. */}
+      {match.refill && !finished && <RefillNoticeModal notice={match.refill} onClose={match.closeRefill} />}
+      {match.popup && !match.refill && !finished && (
         <RoundPopupModal round={match.popup.round} message={match.popup.message} onClose={match.closePopup} />
       )}
-
     </div>
   )
 }

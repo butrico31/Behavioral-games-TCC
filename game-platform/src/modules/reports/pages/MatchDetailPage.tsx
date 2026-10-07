@@ -134,6 +134,10 @@ export function MatchDetailPage() {
                 const player = player_by_role[role]
                 const role_label = index === 0 ? 'Jogador 1' : 'Jogador 2'
                 const role_total = index === 0 ? totals.player1 : totals.player2
+                // RA e e-mail são do analista/aluno que entrou com este jogador: ficam no cartão ao lado.
+                // E-mail de partidas antigas (antes de ficar no jogador) sai do que a partida gravou.
+                const analyst_email =
+                  player?.email || (index === 0 ? data.match.reportEmail : data.match.player2ReportEmail) || null
                 const player_fields: Array<[string, string | number | null | undefined]> = [
                   ['Curso', player?.course],
                   ['Escolaridade', player?.educationLevel],
@@ -182,18 +186,17 @@ export function MatchDetailPage() {
                         )}
                       </div>
 
-                      {/* TODO: placeholders — replace with analyst/student data from the API */}
                       <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
                         <p className="heading-kicker mb-3">Analista / Aluno</p>
                         <dl className="space-y-2">
                           <div>
                             <dt className="text-xs text-muted-foreground">RA</dt>
-                            <dd className="text-sm font-semibold text-foreground">00000000</dd>
+                            <dd className="text-sm font-semibold text-foreground">{player?.ra || 'Não informado'}</dd>
                           </div>
                           <div>
                             <dt className="text-xs text-muted-foreground">E-mail</dt>
                             <dd className="break-all text-sm font-semibold text-foreground">
-                              aluno@email.com
+                              {analyst_email ?? 'Não informado'}
                             </dd>
                           </div>
                         </dl>

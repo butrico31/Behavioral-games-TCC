@@ -7,6 +7,7 @@ import {
   getRouletteMatchState,
   joinRouletteMatch,
   spinRouletteMatch,
+  startRouletteMatch,
 } from '../api/rouletteClient'
 import type {
   RouletteMatchView,
@@ -25,7 +26,15 @@ export interface RoundPopupState {
   message: string
 }
 
-const errorMessage = (error: unknown, fallback: string) =>
+export interface RefillNoticeState {
+  /** Fichas depois da reposição. */
+  coins: number
+  /** Reposições já usadas, contando esta. */
+  used: number
+  max: number
+}
+
+const errorMessage =(error: unknown, fallback: string) =>
   error instanceof RouletteApiError ? error.message : fallback
 
 /**
@@ -40,6 +49,8 @@ export function useRouletteMatch(matchId: string, playerId: string) {
   const [busy, setBusy] = useState(false)
   const [lastSpin, setLastSpin] = useState<RouletteSpinResponse | null>(null)
   const [popup, setPopup] = useState<RoundPopupState | null>(null)
+  /** Aviso de que as fichas zeraram e foram repostas; abre depois da animação do giro. */
+  const [refill, setRefill] = useState<RefillNoticeState | null>(null)
   const [now, setNow] = useState(() => Date.now())
   /** Relógio do servidor menos o local, medido na chegada do estado. */
   const [clockOffset, setClockOffset] = useState(0)
@@ -93,6 +104,28 @@ export function useRouletteMatch(matchId: string, playerId: string) {
     view?.endsAt != null ? Math.max(0, Math.ceil((view.endsAt - serverNow) / 1000)) : null
   const elapsedSeconds = view ? Math.max(0, Math.floor((serverNow - view.startedAt) / 1000)) : 0
 
+  // Saída das instruções: o relógio do servidor só começa aqui (antes, status 'waiting').
+  const [starting, setStarting] = useState(false)
+  const startingRef = useRef(false)
+  const start = useCallback(async () => {
+    if (!view || view.status !== 'waiting' || startingRef.current) return
+    startingRef.current = true
+    setStarting(true)
+    setActionError(null)
+    try {
+      const started = await startRouletteMatch(view.matchId, playerId)
+      applyView(started)
+      if (started.status === 'in_progress' && started.popup) {
+        setPopup({ round: started.round + 1, message: started.popup })
+      }
+    } catch (error) {
+      setActionError(errorMessage(error, 'Não foi possível iniciar a partida.'))
+    } finally {
+      startingRef.current = false
+      setStarting(false)
+    }
+  }, [view, playerId, applyView])
+
   const finish = useCallback(async () => {
     if (!view || finishingRef.current) return
     finishingRef.current = true
@@ -113,9 +146,13 @@ export function useRouletteMatch(matchId: string, playerId: string) {
 
   const spin = useCallback(
     async (opcao: RouletteMoveOption, aposta: number, present: PresentSpin) => {
-      if (!view || busy || !inProgress || popup) return null
+      if (!view || busy || !inProgress || popup || refill) return null
       setBusy(true)
       setActionError(null)
+      // A aposta sai do saldo na hora do clique; o prêmio (aposta + lucro) só entra depois que a
+      // roleta para. É só exibição: o saldo de verdade é o que o servidor devolve no fim.
+      const coinsBefore = view.coins
+      setView((current) => (current ? { ...current, coins: current.coins - aposta } : current))
       try {
         const result = await present(spinRouletteMatch(view.matchId, { playerId, opcao, aposta }))
         setLastSpin(result)
@@ -134,10 +171,15 @@ export function useRouletteMatch(matchId: string, playerId: string) {
               }
             : current
         )
+        if (result.refilled && !result.matchFinished) {
+          setRefill({ coins: result.coinsAmount, used: result.refillsUsed, max: view.maxRefills })
+        }
         if (result.nextPopup) setPopup({ round: result.round + 1, message: result.nextPopup })
         return result
       } catch (error) {
         setActionError(errorMessage(error, 'Falha ao girar a roleta.'))
+        // O giro não valeu: devolve a aposta descontada no clique.
+        setView((current) => (current ? { ...current, coins: coinsBefore } : current))
         // O servidor pode ter encerrado a partida (ex.: prazo): busca o estado atual.
         getRouletteMatchState(view.matchId)
           .then(applyView)
@@ -147,8 +189,10 @@ export function useRouletteMatch(matchId: string, playerId: string) {
         setBusy(false)
       }
     },
-    [view, busy, inProgress, popup, playerId, applyView]
+    [view, busy, inProgress, popup, refill, playerId, applyView]
   )
+
+  const closeRefill = useCallback(() => setRefill(null), [])
 
   // Fechar o popup avisa o servidor, que mede o tempo de leitura para o relatório. Falha aqui não
   // trava o jogo: a jogada só fica sem o tempo de leitura.
@@ -164,8 +208,12 @@ export function useRouletteMatch(matchId: string, playerId: string) {
     busy,
     lastSpin,
     popup,
+    refill,
+    closeRefill,
     remainingSeconds,
     elapsedSeconds,
+    starting,
+    start,
     spin,
     finish,
     closePopup,

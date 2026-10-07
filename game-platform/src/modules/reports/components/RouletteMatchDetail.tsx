@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BarChart3 } from 'lucide-react'
 import { RouletteReportScreen } from '../../roulette/components/RouletteReportScreen'
 import { useRouletteMatchReport } from '../hooks/useRouletteMatchReport'
-import { MatchEmailSender } from './MatchEmailSender'
 import { PointsChart } from './PointsChart'
+import { RouletteBetsChart } from './RouletteBetsChart'
 
 interface RouletteMatchDetailProps {
   sessionId: string
@@ -11,21 +11,14 @@ interface RouletteMatchDetailProps {
 }
 
 /**
- * "Detalhes da Partida" do professor para a roleta: o mesmo relatório que o jogador vê no fim
- * (números vindos do backend), mais os gráficos, que ficam só aqui.
+ * Relatório do professor para a roleta, só no site (sem planilha): o registro de apostas no
+ * formato do modelo, com as colunas de pesquisa a mais, e os gráficos, que ficam só aqui.
  */
 export function RouletteMatchDetail({ sessionId, matchId }: RouletteMatchDetailProps) {
   const navigate = useNavigate()
   const { data: report, is_error } = useRouletteMatchReport(sessionId, matchId)
   const back = () => navigate(`/reports/${sessionId}`)
 
-  const coins = report
-    ? [
-        { round: 0, points: report.summary.initMoney },
-        ...report.rounds.map((r) => ({ round: r.round, points: r.coinsAfter }))
-      ]
-    : []
-  const bets = report ? report.rounds.map((r) => ({ round: r.round, points: r.aposta })) : []
   const times = report
     ? report.rounds
         .filter((r) => r.secondsSinceLast !== null)
@@ -43,7 +36,6 @@ export function RouletteMatchDetail({ sessionId, matchId }: RouletteMatchDetailP
           <ArrowLeft className="h-4 w-4" />
           Voltar para partidas
         </button>
-        <MatchEmailSender sessionId={sessionId} matchId={matchId} />
       </div>
 
       <RouletteReportScreen
@@ -61,14 +53,11 @@ export function RouletteMatchDetail({ sessionId, matchId }: RouletteMatchDetailP
             </div>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="surface-subtle p-5 lg:col-span-2">
-                <p className="heading-kicker mb-2">Fichas versus Jogadas</p>
-                <PointsChart data={coins} valueLabel="Fichas" roundLabel="Jogadas" />
+                <p className="heading-kicker mb-2">Valor na mesa, valor apostado e total por rodada</p>
+                <RouletteBetsChart rounds={report.rounds} />
+                <p className="mt-3 text-sm font-semibold text-foreground">{report.summary.reinforcementSummary}</p>
               </div>
-              <div className="surface-subtle p-5">
-                <p className="heading-kicker mb-2">Aposta por jogada</p>
-                <PointsChart data={bets} valueLabel="Aposta" roundLabel="Jogadas" />
-              </div>
-              <div className="surface-subtle p-5">
+              <div className="surface-subtle p-5 lg:col-span-2">
                 <p className="heading-kicker mb-2">Tempo desde a última jogada (s)</p>
                 <PointsChart data={times} valueLabel="Segundos" roundLabel="Jogadas" />
               </div>

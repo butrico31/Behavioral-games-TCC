@@ -233,7 +233,7 @@ export function RoundScreen({
             {/* Aviso de queda no lugar do status: não acrescenta altura à mesa. */}
             {opponentAway ? (
               <span className="rounded-full border-2 border-[#FBE7B4] bg-[#FFF8E6] px-3 py-0.5 text-[12.5px] font-bold text-[#6B5A2A]">
-                saiu da partida · aguardando o retorno…
+                saiu da partida · se não voltar em instantes, a partida será encerrada
               </span>
             ) : (
               <span className="text-[13px] font-bold text-[#3C4654]">

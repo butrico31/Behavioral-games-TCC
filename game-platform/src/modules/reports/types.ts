@@ -48,6 +48,8 @@ export interface SessionResultsInfo {
 
 export interface PlayerResult {
   id: string
+  ra: string | null
+  email: string | null
   educationLevel: string | null
   semester: number | null
   course: string | null
@@ -87,6 +89,9 @@ export interface MatchSummary {
   player2_id: string
   status: string
   matchTime: number | null
+  /** E-mails digitados na entrada (jogador 1 e 2), gravados na partida. */
+  reportEmail?: string | null
+  player2ReportEmail?: string | null
   moves: MatchMoves
   created_at: string
   /** Só em sessões de roleta: resumo calculado no backend para a lista de partidas. */

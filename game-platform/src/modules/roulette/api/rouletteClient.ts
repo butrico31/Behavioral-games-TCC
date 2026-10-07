@@ -81,6 +81,18 @@ export async function joinRouletteMatch(
   }
 }
 
+/** Jogador saiu das instruções: o servidor começa a contar o tempo da partida a partir daqui. */
+export async function startRouletteMatch(matchId: string, playerId: string): Promise<RouletteMatchView> {
+  try {
+    const response = await roulette_client.post<RouletteMatchView>(`/roulette/matches/${matchId}/start`, {}, {
+      params: { playerId },
+    })
+    return response.data
+  } catch (error) {
+    throw new RouletteApiError(resolveErrorMessage(error))
+  }
+}
+
 export async function spinRouletteMatch(matchId: string, payload: RouletteSpinRequest): Promise<RouletteSpinResponse> {
   try {
     const response = await roulette_client.post<RouletteSpinResponse>(`/roulette/matches/${matchId}/spin`, payload)

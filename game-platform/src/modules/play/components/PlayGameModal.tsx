@@ -5,9 +5,10 @@ import { useJoinSession } from '../../game-session/hooks/useJoinSession'
 import { sanitizeString, validateSessionCode, validateInput, validateEmail } from '../../../shared/utils/validation'
 import { RateLimiter } from '../../../shared/utils/security'
 import { MATCH_SESSION_STORAGE_KEYS } from '../../../shared/constants/storageKeys'
-import { usePlayableSessions } from '../hooks/usePlayableSessions'
+import { isAxiosError } from 'axios'
+import { sessionService } from '../../game-session/services/sessionService'
 import type { PlayTheme } from '../hooks/usePlayTheme'
-import type { Session, SessionRequirement, JoinSessionPayload, JoinSessionResponse } from '../../game-session/types'
+import type { PublicSession, SessionRequirement, JoinSessionPayload, JoinSessionResponse } from '../../game-session/types'
 
 interface PlayGameModalProps {
   theme: PlayTheme
@@ -17,6 +18,9 @@ interface PlayGameModalProps {
 type ModalStep = 'game' | 'code' | 'fields'
 
 const rate_limiter = new RateLimiter(5, 60000)
+
+/** RA: só letras, números, ponto e hífen, até 30 caracteres (mesmo limite do backend). */
+const RA_PATTERN = /^[A-Za-z0-9.-]{1,30}$/
 
 const EDUCATION_LEVEL_OPTIONS = [
   { value: 'elementary',   label: 'Ensino Fundamental' },
@@ -59,14 +63,14 @@ function resolveGameRoute(game: string, matchId: string, playerId: string, sessi
 export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
   const navigate = useNavigate()
   const { games, is_loading: games_loading, is_error: games_error } = useGames()
-  const { sessions } = usePlayableSessions()
-
   const [step, setStep] = useState<ModalStep>('game')
   const [selected_game, setSelectedGame] = useState('')
   const [code, setCode] = useState('')
-  const [matched_session, setMatchedSession] = useState<Session | null>(null)
+  const [looking_up, setLookingUp] = useState(false)
+  const [matched_session, setMatchedSession] = useState<PublicSession | null>(null)
   const [form_data, setFormData] = useState<Record<string, string>>({})
   const [player_email, setPlayerEmail] = useState('')
+  const [player_ra, setPlayerRa] = useState('')
   const [validation_error, setValidationError] = useState('')
 
   const { joinSession, is_joining } = useJoinSession(matched_session?.id ?? '')
@@ -81,9 +85,11 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
     [matched_session]
   )
 
-  const handleJoin = useCallback((target_session: Session, extra_data: Record<string, string>) => {
+  const handleJoin = useCallback((target_session: PublicSession, extra_data: Record<string, string>) => {
     const payload: JoinSessionPayload = {
-      inviteCode: code.trim().toUpperCase()
+      inviteCode: code.trim().toUpperCase(),
+      ra: sanitizeString(player_ra),
+      email: player_email.trim() || undefined
     }
 
     const target_requirements = target_session.inputInfo.filter((field) => field in PLAYER_FIELD_DEFS)
@@ -116,7 +122,7 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
         setValidationError('Não foi possível entrar na sessão. Verifique o código e tente novamente.')
       }
     })
-  }, [code, joinSession, onClose, navigate, player_email])
+  }, [code, joinSession, onClose, navigate, player_email, player_ra])
 
   const handleSelectGame = useCallback((game_id: string) => {
     setSelectedGame(game_id)
@@ -124,7 +130,11 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
     setStep('code')
   }, [])
 
-  const handleCodeSubmit = useCallback(() => {
+  // Busca só a sessão do código digitado, e só ao continuar: nada é baixado antes, e cada
+  // tentativa vai ao servidor (uma sessão criada agora já aparece, sem precisar de F5).
+  const handleCodeSubmit = useCallback(async () => {
+    if (looking_up) return
+
     if (!code.trim()) {
       setValidationError('Digite o código da sessão')
       return
@@ -140,23 +150,43 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
       return
     }
 
-    const found = sessions.find(
-      (s) => s.game === selected_game && s.inviteCode.toUpperCase() === code.trim().toUpperCase()
-    )
-
-    if (!found) {
-      setValidationError('Código inválido para este jogo')
-      return
-    }
-
-    rate_limiter.reset(`play-${selected_game}`)
+    setLookingUp(true)
     setValidationError('')
-    setMatchedSession(found)
-    setStep('fields')
-  }, [code, selected_game, sessions])
+    try {
+      const found = await sessionService.getSessionByCode(code)
+
+      if (found.game !== selected_game) {
+        setValidationError('Este código é de outro jogo. Volte e escolha o jogo certo.')
+        return
+      }
+
+      if (!found.isActive) {
+        setValidationError('Esta sessão já foi encerrada. Peça um novo código ao professor.')
+        return
+      }
+
+      rate_limiter.reset(`play-${selected_game}`)
+      setMatchedSession(found)
+      setStep('fields')
+    } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined
+      setValidationError(
+        status === 404
+          ? 'Sessão não encontrada. Confira o código com o professor.'
+          : 'Não foi possível buscar a sessão. Verifique sua conexão e tente de novo.'
+      )
+    } finally {
+      setLookingUp(false)
+    }
+  }, [code, selected_game, looking_up])
 
   const handleFieldsSubmit = useCallback(() => {
     if (!matched_session) return
+
+    if (!RA_PATTERN.test(player_ra.trim())) {
+      setValidationError('Digite um RA válido (apenas letras e números)')
+      return
+    }
 
     if (!validateEmail(player_email.trim())) {
       setValidationError('Digite um e-mail válido')
@@ -186,7 +216,7 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
 
     setValidationError('')
     handleJoin(matched_session, form_data)
-  }, [matched_session, requirements, form_data, player_email, handleJoin])
+  }, [matched_session, requirements, form_data, player_email, player_ra, handleJoin])
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value.substring(0, 500) }))
@@ -204,7 +234,7 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ position: 'relative', width: '100%', maxWidth: 440, background: 'var(--modal-bg)', borderRadius: 24, padding: 32, boxShadow: '0 30px 70px rgba(0,0,0,.3)', fontFamily: 'Manrope, Helvetica, Arial, sans-serif' }}
+        style={{ position: 'relative', width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto', background: 'var(--modal-bg)', borderRadius: 24, padding: 32, boxShadow: '0 30px 70px rgba(0,0,0,.3)', fontFamily: 'Manrope, Helvetica, Arial, sans-serif' }}
       >
         <button
           type="button"
@@ -248,7 +278,7 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
               type="text"
               value={code}
               onChange={(e) => { setCode(e.target.value.toUpperCase()); setValidationError('') }}
-              onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleCodeSubmit() }}
               placeholder="A1B2C3"
               maxLength={10}
               style={{ width: '100%', padding: '14px 16px', marginBottom: 8, borderRadius: 12, border: '2px solid var(--prof-border)', textAlign: 'center', fontSize: 18, letterSpacing: '.3em', fontFamily: 'Montserrat', fontWeight: 700, color: 'var(--modal-title)', background: 'none' }}
@@ -257,11 +287,11 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
 
             <button
               type="button"
-              onClick={handleCodeSubmit}
-              disabled={is_joining}
-              style={{ width: '100%', padding: '14px 28px', marginTop: 14, border: 'none', borderRadius: 999, background: 'var(--modal-btn)', color: '#fff', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, cursor: is_joining ? 'default' : 'pointer', opacity: is_joining ? 0.7 : 1 }}
+              onClick={() => void handleCodeSubmit()}
+              disabled={looking_up}
+              style={{ width: '100%', padding: '14px 28px', marginTop: 14, border: 'none', borderRadius: 999, background: 'var(--modal-btn)', color: '#fff', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, cursor: looking_up ? 'default' : 'pointer', opacity: looking_up ? 0.7 : 1 }}
             >
-              {is_joining ? 'Entrando...' : 'Continuar'}
+              {looking_up ? 'Buscando sessão...' : 'Continuar'}
             </button>
           </>
         )}
@@ -272,6 +302,21 @@ export function PlayGameModal({ theme, onClose }: PlayGameModalProps) {
             <p style={{ margin: '0 0 22px', fontSize: 15, lineHeight: 1.5, color: 'var(--modal-text)' }}>Preencha os dados solicitados para entrar na sessão.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
+              <div style={{ textAlign: 'left' }}>
+                <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: 'var(--modal-title)' }}>
+                  RA <span style={{ color: '#c04040' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={player_ra}
+                  onChange={(e) => { setPlayerRa(e.target.value.substring(0, 30)); setValidationError('') }}
+                  placeholder="Ex: 12345678"
+                  maxLength={30}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid var(--prof-border)', fontSize: 14, color: 'var(--modal-title)', background: 'none' }}
+                />
+              </div>
               <div style={{ textAlign: 'left' }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: 'var(--modal-title)' }}>
                   E-mail <span style={{ color: '#c04040' }}>*</span>

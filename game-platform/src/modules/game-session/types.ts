@@ -109,6 +109,16 @@ export type CreateSessionResponse =
 
 // -- Join Session Types --
 
+/** O que GET /sessions/codigo/:codigo devolve: só o necessário para o aluno entrar. */
+export interface PublicSession {
+  id: string
+  session_name: string | null
+  game: string
+  inviteCode: string
+  isActive: boolean
+  inputInfo: string[]
+}
+
 export interface SessionRequirement {
   field: string
   label: string
@@ -119,6 +129,9 @@ export interface SessionRequirement {
 
 export interface JoinSessionPayload {
   inviteCode: string
+  ra: string
+  /** E-mail do analista/aluno: fica salvo no jogador e é para onde vai o relatório. */
+  email?: string
   educationLevel?: string
   semester?: number
   course?: string
@@ -129,6 +142,8 @@ export interface JoinSessionPayload {
 
 export interface JoinSessionPlayer {
   id: string
+  ra?: string | null
+  email?: string | null
   session_id: string
   educationLevel?: string
   semester?: number
@@ -293,11 +308,11 @@ export interface MatchResult {
   matchId: string
   finalScore: { player1: number; player2: number }
   moves: Record<string, RoundMoves>
-  /** 'rodadas' (fim natural), 'tempo_sessao' ou 'sessao_encerrada'. */
+  /** 'rodadas' (fim natural), 'tempo_sessao', 'sessao_encerrada' ou 'abandono'. */
   endedReason?: MatchEndedReason
   roundsPlayed?: number
   /** Rodada que estava aberta quando a sessão acabou: sem pontos. */
   interruptedRound?: number | null
 }
 
-export type MatchEndedReason = 'rodadas' | 'tempo_sessao' | 'sessao_encerrada'
+export type MatchEndedReason = 'rodadas' | 'tempo_sessao' | 'sessao_encerrada' | 'abandono'

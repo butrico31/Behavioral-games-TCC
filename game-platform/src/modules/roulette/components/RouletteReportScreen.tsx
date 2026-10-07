@@ -28,6 +28,8 @@ const fmtDateTime = (iso: string | null) =>
 
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
 
+const fmtPct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`)
+
 const EMAIL_COPY: Record<RouletteReport['email']['status'], (to: string | null) => string> = {
   sent: (to) => `Relatório enviado para ${to ?? 'o seu e-mail'}.`,
   pending: () => 'Enviando o relatório por e-mail…',
@@ -73,7 +75,7 @@ export function RouletteReportScreen({
     ['Reposições de saldo', String(summary.refillsUsed)],
     ['Jogadas', String(summary.totalRounds)],
     ['Vitórias / derrotas', `${summary.wins} / ${summary.losses}`],
-    ['Taxa de acerto', `${Math.round(summary.winRate * 100)}%`],
+    ['Reforçado / punido', `${summary.reinforcedPercent}% / ${summary.punishedPercent}%`],
     ['Total apostado', String(summary.totalBet)],
     ['Aposta média', summary.averageBet.toLocaleString('pt-BR')],
     ['Maior / menor aposta', `${summary.maxBet} / ${summary.minBet}`],
@@ -178,7 +180,10 @@ export function RouletteReportScreen({
 
       <section className="surface-panel mb-6 p-6 md:p-8">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <h2 className="text-2xl text-foreground md:text-3xl">Jogadas</h2>
+          <div>
+            <h2 className="text-2xl text-foreground md:text-3xl">Registro das apostas</h2>
+            <p className="mt-1 text-sm font-semibold text-foreground">{summary.reinforcementSummary}</p>
+          </div>
           <span className="rounded-full border border-border bg-secondary/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
             {summary.totalRounds} {summary.totalRounds === 1 ? 'jogada' : 'jogadas'}
           </span>
@@ -188,43 +193,59 @@ export function RouletteReportScreen({
           <div className="py-12 text-center text-sm text-muted-foreground">Nenhuma jogada registrada nesta partida.</div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border/80">
-            <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
               <thead className="bg-secondary/35 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 font-semibold">Rodada</th>
+                  <th className="px-3 py-3 font-semibold">Frase</th>
+                  <th className="px-3 py-3 font-semibold">Valor na mesa</th>
+                  <th className="px-3 py-3 font-semibold">Valor apostado</th>
+                  <th className="px-3 py-3 font-semibold">Cor selecionada</th>
+                  <th className="px-3 py-3 font-semibold">Prob. cor selecionada</th>
+                  <th className="px-3 py-3 font-semibold">Cor certa</th>
+                  <th className="px-3 py-3 font-semibold">Prob. cor certa</th>
+                  <th className="px-3 py-3 font-semibold">Total</th>
+                  <th className="px-3 py-3 font-semibold">Resultado</th>
+                  <th className="px-3 py-3 font-semibold">Casa</th>
                   <th className="px-3 py-3 font-semibold">Horário</th>
                   <th className="px-3 py-3 font-semibold">Desde a última</th>
-                  <th className="px-3 py-3 font-semibold">Condição</th>
-                  <th className="px-3 py-3 font-semibold">Aposta</th>
-                  <th className="px-3 py-3 font-semibold">Casa</th>
-                  <th className="px-3 py-3 font-semibold">Resultado</th>
-                  <th className="px-3 py-3 font-semibold">Variação</th>
-                  <th className="px-3 py-3 font-semibold">Saldo após</th>
-                  <th className="px-3 py-3 font-semibold">Popup</th>
+                  <th className="px-3 py-3 font-semibold">Leitura da frase</th>
                 </tr>
               </thead>
               <tbody>
                 {report.rounds.map((r) => (
                   <tr key={r.round} className="border-t border-border/70 bg-card/35">
                     <td className="px-3 py-3 font-medium text-foreground">{r.round}</td>
-                    <td className="px-3 py-3 font-data text-xs text-muted-foreground">{fmtTime(r.playedAt)}</td>
-                    <td className="px-3 py-3 text-foreground">{fmtSeconds(r.secondsSinceLast)}</td>
+                    <td className="max-w-[220px] px-3 py-3 text-foreground">
+                      {r.popupMessage ? (
+                        <span title={r.popupMessage} className="line-clamp-2 whitespace-pre-line break-words">
+                          {r.popupMessage}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-foreground">{r.coinsBefore}</td>
+                    <td className="px-3 py-3 text-foreground">{r.aposta}</td>
                     <td className="px-3 py-3 text-foreground">
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CONDITION_COLORS[r.opcao] }} />
-                        {r.opcaoLabel}
+                        {r.opcaoLabel.toLowerCase()}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-foreground">{r.aposta}</td>
+                    <td className="px-3 py-3 text-foreground">{fmtPct(r.winProbability)}</td>
                     <td className="px-3 py-3 text-foreground">
-                      {r.pocket ?? '—'}
-                      {r.resultadoLabel && <span className="text-muted-foreground"> · {r.resultadoLabel}</span>}
+                      {r.resultado ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CONDITION_COLORS[r.resultado] }} />
+                          {r.resultadoLabel?.toLowerCase()}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
-                    <td className={`px-3 py-3 font-semibold ${r.won ? 'text-success' : 'text-destructive'}`}>
-                      {r.won ? 'Ganhou' : 'Perdeu'}
-                    </td>
-                    <td className={`px-3 py-3 ${r.delta >= 0 ? 'text-success' : 'text-destructive'}`}>{signed(r.delta)}</td>
-                    <td className="px-3 py-3 text-foreground">
+                    <td className="px-3 py-3 text-foreground">{fmtPct(r.resultProbability)}</td>
+                    <td className="px-3 py-3 font-semibold text-foreground">
                       {r.coinsAfter}
                       {r.refilled && (
                         <span
@@ -235,9 +256,15 @@ export function RouletteReportScreen({
                         </span>
                       )}
                     </td>
+                    <td className={`px-3 py-3 font-semibold ${r.won ? 'text-success' : 'text-destructive'}`}>
+                      {r.won ? 'Reforçado' : 'Punido'}
+                    </td>
+                    <td className="px-3 py-3 text-foreground">{r.pocket ?? '—'}</td>
+                    <td className="px-3 py-3 font-data text-xs text-muted-foreground">{fmtTime(r.playedAt)}</td>
+                    <td className="px-3 py-3 text-foreground">{fmtSeconds(r.secondsSinceLast)}</td>
                     <td className="px-3 py-3 text-muted-foreground">
                       {r.popupMessage ? (
-                        <span title={r.popupMessage} className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5">
                           <MessageSquareText className="h-3.5 w-3.5 text-primary" />
                           {fmtSeconds(r.popupReadSeconds)}
                         </span>
@@ -251,17 +278,25 @@ export function RouletteReportScreen({
               <tfoot>
                 <tr className="border-t border-border bg-secondary/45 font-semibold text-foreground">
                   <td className="px-3 py-3">Total</td>
+                  <td className="px-3 py-3">{summary.popupsShown} frases</td>
                   <td className="px-3 py-3 text-muted-foreground">—</td>
+                  <td className="px-3 py-3">{summary.totalBet}</td>
+                  <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
+                    —
+                  </td>
+                  <td className="px-3 py-3">{summary.finalCoins}</td>
+                  <td className="px-3 py-3">
+                    {summary.reinforcedPercent}% / {summary.punishedPercent}%
+                  </td>
+                  <td className="px-3 py-3 text-muted-foreground" colSpan={2}>
+                    —
+                  </td>
                   <td className="px-3 py-3">
                     {summary.averageSecondsBetween !== null ? `média ${fmtSeconds(summary.averageSecondsBetween)}` : '—'}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">—</td>
-                  <td className="px-3 py-3">{summary.totalBet}</td>
-                  <td className="px-3 py-3 text-muted-foreground">—</td>
-                  <td className="px-3 py-3">{summary.wins} vitórias</td>
-                  <td className="px-3 py-3">{signed(summary.netResult)}</td>
-                  <td className="px-3 py-3">{summary.finalCoins}</td>
-                  <td className="px-3 py-3">{summary.popupsShown} popups</td>
+                  <td className="px-3 py-3">
+                    {summary.averagePopupReadSeconds !== null ? `média ${fmtSeconds(summary.averagePopupReadSeconds)}` : '—'}
+                  </td>
                 </tr>
               </tfoot>
             </table>

@@ -5,7 +5,7 @@
 
 export type RouletteMoveOption = 'azul' | 'vermelho' | 'preto'
 
-export type RouletteMatchStatus = 'in_progress' | 'finished'
+export type RouletteMatchStatus = 'waiting' | 'in_progress' | 'finished'
 
 /** 'meta' = atingiu a meta, 'saldo' = fichas acabaram, 'tempo' = prazo, 'jogador' = encerrou. */
 export type RouletteEndedReason = 'meta' | 'saldo' | 'tempo' | 'jogador'
@@ -20,7 +20,7 @@ export interface RouletteCondition {
   id: RouletteMoveOption
   label: string
   payout: number
-  /** Texto pronto para a mesa, ex.: "paga 2×". */
+  /** Texto pronto para a mesa, ex.: "paga 4×". */
   payoutLabel: string
   chance: number
 }
@@ -124,7 +124,10 @@ export interface RouletteReportRound {
   delta: number
   coinsBefore: number
   coinsAfter: number
+  /** Chance da cor apostada ("Prob. cor selecionada"). */
   winProbability: number | null
+  /** Chance da cor sorteada ("Prob. cor certa"). */
+  resultProbability: number | null
   pityStreak: number | null
   popupMessage: string | null
   popupReadSeconds: number | null
@@ -161,6 +164,11 @@ export interface RouletteReport {
     wins: number
     losses: number
     winRate: number
+    /** % de jogadas reforçadas (ganhou) e punidas (perdeu). */
+    reinforcedPercent: number
+    punishedPercent: number
+    /** "Foi reforçado em X% das jogadas, e punido em Y%." */
+    reinforcementSummary: string
     totalBet: number
     averageBet: number
     maxBet: number
